@@ -1,0 +1,15 @@
+version: "1.0-mvp"
+mode: "permissive"
+
+zones:
+  green:
+    description: "Safe commands"
+    binaries: [ls, cat, pwd, echo, date]
+  
+  yellow:
+    description: "Logged commands"
+    binaries: [curl, wget, git]
+  
+  red:
+    description: "Dangerous commands"
+    binaries: [rm, mv, chmod, sudo]

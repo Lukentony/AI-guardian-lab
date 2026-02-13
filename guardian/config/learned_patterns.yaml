@@ -1,0 +1,52 @@
+learned_patterns:
+  enabled: true
+  patterns:
+  - confidence: 77.78
+    pattern: \bdev\b
+    token: dev
+  - confidence: 44.44
+    pattern: \bsudo\b
+    token: sudo
+  - confidence: 44.44
+    pattern: \brm\b
+    token: rm
+  - confidence: 44.44
+    pattern: \brf\b
+    token: rf
+  - confidence: 33.33
+    pattern: \bmkfs\b
+    token: mkfs
+  - confidence: 33.33
+    pattern: \bext4\b
+    token: ext4
+suggestions:
+- confidence: 77.78
+  occurrences: 7
+  pattern: \bdev\b
+  status: pending_review
+  token: dev
+- confidence: 44.44
+  occurrences: 4
+  pattern: \bsudo\b
+  status: pending_review
+  token: sudo
+- confidence: 44.44
+  occurrences: 4
+  pattern: \brm\b
+  status: pending_review
+  token: rm
+- confidence: 44.44
+  occurrences: 4
+  pattern: \brf\b
+  status: pending_review
+  token: rf
+- confidence: 33.33
+  occurrences: 3
+  pattern: \bmkfs\b
+  status: pending_review
+  token: mkfs
+- confidence: 33.33
+  occurrences: 3
+  pattern: \bext4\b
+  status: pending_review
+  token: ext4

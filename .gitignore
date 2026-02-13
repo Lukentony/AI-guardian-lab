@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Environment & Secrets
+.env
+*.key
+*.pem
+
+# Database
+*.db
+*.sqlite3
+
+# Docker
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+SESSION_STATE_*.md
+SESSION_LOG.md
+PROJECT_STATE.md
+workspace/
+!workspace/.gitkeep
+
+# AI Agent Artifacts
+.gemini/
+.agent/
+.braintrust/
+
+# OS
+.DS_Store
+Thumbs.db

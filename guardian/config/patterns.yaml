@@ -1,0 +1,66 @@
+# AI Guardian Lab - Static Dangerous Patterns
+version: "1.0"
+
+patterns:
+  filesystem_destruction:
+    - pattern: 'rm\s+-rf\s+/'
+      severity: critical
+    - pattern: 'mkfs\.'
+      severity: critical
+    - pattern: 'dd\s+if=/dev/(zero|random)\s+of=/dev/(sd|hd)'
+      severity: critical
+    - pattern: '>/dev/sd[a-z]'
+      severity: critical
+    - pattern: 'mv\s+/\s+'
+      severity: critical
+
+  fork_bombs:
+    - pattern: ':\(\)\{\s*:\|:&\s*\};:'
+      severity: critical
+
+  privilege_escalation:
+    - pattern: 'sudo\s+su\s+-'
+      severity: high
+    - pattern: 'chmod\s+-R\s+777'
+      severity: high
+
+  remote_execution:
+    - pattern: 'wget.*\|\s*sh'
+      severity: critical
+    - pattern: 'curl.*\|\s*bash'
+      severity: critical
+    - pattern: 'eval\s+\$\('
+      severity: high
+
+  dangerous_find:
+    - pattern: 'find\s+/.*-exec\s+rm'
+      severity: high
+
+  # SEC-03: Encoding Bypasses
+  encoding_bypass:
+    - pattern: 'base64\s+-d'
+      severity: critical
+    - pattern: 'xxd\s+-r'
+      severity: critical
+    - pattern: 'perl\s+-e'
+      severity: high
+    - pattern: 'python.*-c'
+      severity: high
+    - pattern: 'openssl\s+enc\s+-d'
+      severity: high
+
+  # SEC-05: Strict Privilege Escalation (Overrides older weak patterns)
+  strict_sudo:
+    - pattern: '^sudo\s+'
+      severity: high
+    - pattern: 'doas\s+'
+      severity: high
+
+  # Exfiltration
+  exfiltration:
+    - pattern: 'nc\s+\d+\.\d+\.\d+\.\d+'
+      severity: high
+    - pattern: 'curl\s+.*-X\s+POST'
+      severity: medium
+    - pattern: 'wget\s+--post-data'
+      severity: medium

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Guardian Lab - Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a2e; color: #eee; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { font-size: 2em; margin-bottom: 30px; color: #16c79a; }
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 40px; }
+        .stat-card { background: #16213e; padding: 25px; border-radius: 12px; text-align: center; border: 2px solid #0f3460; }
+        .stat-card h2 { font-size: 3em; margin-bottom: 10px; }
+        .stat-card.total h2 { color: #16c79a; }
+        .stat-card.executed h2 { color: #4ecdc4; }
+        .stat-card.rejected h2 { color: #ff6b6b; }
+        .stat-card p { font-size: 1.1em; color: #aaa; }
+        table { width: 100%; background: #16213e; border-radius: 12px; overflow: hidden; border-collapse: collapse; }
+        th { background: #0f3460; padding: 15px; text-align: left; color: #16c79a; font-weight: 600; }
+        td { padding: 12px 15px; border-bottom: 1px solid #0f3460; }
+        tr:hover { background: #1a2942; }
+        .status { padding: 5px 12px; border-radius: 20px; font-size: 0.85em; font-weight: 600; }
+        .status.executed { background: #4ecdc4; color: #000; }
+        .status.rejected { background: #ff6b6b; color: #fff; }
+        .command { font-family: 'Courier New', monospace; font-size: 0.9em; color: #ffd700; }
+        .reason { color: #ff6b6b; font-size: 0.85em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛡️ AI Guardian Lab Dashboard</h1>
+        
+        <div class="stats">
+            <div class="stat-card total">
+                <h2>{{ stats.total }}</h2>
+                <p>Comandi Totali</p>
+            </div>
+            <div class="stat-card executed">
+                <h2>{{ stats.executed }}</h2>
+                <p>Eseguiti</p>
+            </div>
+            <div class="stat-card rejected">
+                <h2>{{ stats.rejected }}</h2>
+                <p>Bloccati</p>
+            </div>
+        </div>
+
+        <h2 style="margin-bottom: 20px; color: #16c79a;">📜 Ultimi 20 Comandi</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Task</th>
+                    <th>Comando</th>
+                    <th>Status</th>
+                    <th>LLM</th>
+                    <th>Motivo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cmd in commands %}
+                <tr>
+                    <td>{{ cmd.timestamp }}</td>
+                    <td>{{ cmd.task[:50] }}</td>
+                    <td class="command">{{ cmd.command[:60] }}</td>
+                    <td><span class="status {{ cmd.status }}">{{ cmd.status }}</span></td>
+                    <td>{{ cmd.llm_provider }}</td>
+                    <td class="reason">{{ cmd.guardian_reason[:40] if cmd.guardian_reason else '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

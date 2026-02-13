@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  guardian:
+    build:
+      context: ./guardian
+    container_name: lab-guardian
+    networks:
+      - agent-net
+    environment:
+      - API_KEY=${API_KEY}
+    volumes:
+      - ./guardian/config:/app/config:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  agent:
+    build:
+      context: ./agent
+    container_name: lab-agent
+    ports:
+      - "5001:5001"
+    networks:
+      - agent-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - GUARDIAN_URL=http://guardian:5000
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - LLM_MODEL_CODER=${LLM_MODEL_CODER:-qwen2.5-coder:7b}
+      - LLM_MODEL_EXPLAIN=${LLM_MODEL_EXPLAIN:-qwen2.5-coder:7b}
+      - API_KEY=${API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - guardian
+
+  ui:
+    build:
+      context: ./ui
+    container_name: lab-ui
+    ports:
+      - "8080:8080"
+    networks:
+      - agent-net
+    environment:
+      - AGENT_URL=http://agent:5001
+      - GUARDIAN_URL=http://guardian:5000
+    restart: unless-stopped
+    depends_on:
+      - agent
+      - guardian
+
+networks:
+  agent-net:
+    driver: bridge
