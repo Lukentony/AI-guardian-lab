@@ -170,7 +170,7 @@ Result: Fast inference, free tier limits
 Scenario 3: Remote Ollama Server
 Best for: Team setup, shared LLM infrastructure
 
-Note your Ollama server IP (e.g., 192.168.1.100:11434)
+Note your Ollama server IP (e.g., 192.168.x.x:11434)
 
 Run installer: ./install.sh → Enter remote host
 
@@ -213,7 +213,7 @@ bash
 OLLAMA_HOST=0.0.0.0:11434 ollama serve
 
 # In Guardian .env, set remote host
-OLLAMA_HOST=http://192.168.1.100:11434
+OLLAMA_HOST=http://192.168.x.x:11434
 Post-Installation
 Validate Configuration
 bash

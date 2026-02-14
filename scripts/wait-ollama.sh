@@ -1,5 +1,5 @@
 #!/bin/bash
-OLLAMA_URL="${OLLAMA_URL:-http://192.168.0.50:11434}"
+OLLAMA_URL="${OLLAMA_URL:-http://<ollama-ip>:11434}"
 MAX_RETRIES=30
 RETRY_DELAY=2
 

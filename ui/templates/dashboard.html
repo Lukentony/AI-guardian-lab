@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -34,28 +34,28 @@
         <div class="stats">
             <div class="stat-card total">
                 <h2>{{ stats.total }}</h2>
-                <p>Comandi Totali</p>
+                <p>Total Commands</p>
             </div>
             <div class="stat-card executed">
                 <h2>{{ stats.executed }}</h2>
-                <p>Eseguiti</p>
+                <p>Executed</p>
             </div>
             <div class="stat-card rejected">
                 <h2>{{ stats.rejected }}</h2>
-                <p>Bloccati</p>
+                <p>Blocked</p>
             </div>
         </div>
 
-        <h2 style="margin-bottom: 20px; color: #16c79a;">📜 Ultimi 20 Comandi</h2>
+        <h2 style="margin-bottom: 20px; color: #16c79a;">📜 Recent Commands (Last 20)</h2>
         <table>
             <thead>
                 <tr>
                     <th>Timestamp</th>
                     <th>Task</th>
-                    <th>Comando</th>
+                    <th>Command</th>
                     <th>Status</th>
                     <th>LLM</th>
-                    <th>Motivo</th>
+                    <th>Reason</th>
                 </tr>
             </thead>
             <tbody>

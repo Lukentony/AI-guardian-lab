@@ -3,7 +3,7 @@ service:
   version: "0.1.0"
 
 endpoints:
-  ollama: "http://192.168.0.50:11434/api/generate"
+  ollama: "http://<ollama-ip>:11434/api/generate"
   guardian: "http://guardian:5000"
 
 timeouts:

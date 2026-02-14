@@ -30,6 +30,7 @@ ENV/
 SESSION_STATE_*.md
 SESSION_LOG.md
 PROJECT_STATE.md
+SOCIAL_MEDIA_KIT.md
 workspace/
 !workspace/.gitkeep
 

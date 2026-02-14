@@ -1,38 +1,33 @@
+# System Architecture
 
-Architettura Sistema
-Network Topology
-text
-LAN 192.168.0.0/24
-├─ NUC1 (192.168.0.90) - Gateway
-├─ PC Ollama (192.168.0.50) - LLM
-└─ NUC2 (10.10.10.2) - Sandbox
-   ├─ lab-guardian (172.30.0.3:5000)
-   └─ lab-agent (172.30.0.2:5001)
-Data Flow
-User → Agent: POST /execute {"task": "..."}
+## Network Topology
+```text
+Local LAN (e.g., 192.168.1.0/24)
+├─ Gateway Server (Local IP A)
+├─ LLM Server (Local IP B) - Running Ollama/vLLM
+└─ Sandbox Host (Local IP C) - Security Perimeter
+   ├─ lab-guardian (Container IP: 172.30.0.3)
+   └─ lab-agent (Container IP: 172.30.0.2)
+```
 
-Agent → Ollama: Genera comando bash
+## Data Flow
+1. **User → Agent**: POST /execute {"task": "..."}
+2. **Agent → LLM**: Generate bash command
+3. **Agent → Guardian**: POST /validate {"command": "..."}
+4. **Guardian**: Pattern matching & security validation
+5. **Agent**: Execute if approved / Reject if blocked
+6. **Agent → Guardian**: POST /report (logging)
 
-Agent → Guardian: POST /validate {"command": "..."}
+## Endpoints
 
-Guardian: Pattern matching
+### Guardian (Port 5000)
+- `GET /health`
+- `POST /validate`
+- `POST /report`
 
-Agent: Execute se approvato / Reject se bloccato
+### Agent (Port 5001)
+- `GET /health`
+- `POST /execute`
 
-Agent → Guardian: POST /report (log)
-
-Endpoints
-Guardian (5000)
-GET /health
-
-POST /validate
-
-POST /report
-
-Agent (5001)
-GET /health
-
-POST /execute
-
-Pattern Bloccati
-rm -rf, sudo, passwd, mkfs, dd, chmod 777, iptables, shutdown, reboot, kill -9
+## Blocked Patterns
+`rm -rf`, `sudo`, `passwd`, `mkfs`, `dd`, `chmod 777`, `iptables`, `shutdown`, `reboot`, `kill -9`

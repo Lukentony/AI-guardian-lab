@@ -38,7 +38,7 @@ Remote Ollama Server:
 
 text
 LLM_PROVIDER=ollama
-OLLAMA_HOST=http://192.168.1.100:11434
+OLLAMA_HOST=http://<your-ollama-host-ip>:11434
 OLLAMA_MODEL_CODER=deepseek-coder:6.7b
 OLLAMA_MODEL_EXPLAIN=llama3.2:3b-instruct-q4_K_M
 Docker Compose Access (from containers):

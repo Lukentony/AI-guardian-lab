@@ -98,7 +98,7 @@ fi
 if [ "$OLLAMA_DETECTED" = false ]; then
     read -p "Do you have Ollama running on a remote server? (y/n): " has_remote
     if [ "$has_remote" = "y" ]; then
-        read -p "Enter Ollama host (e.g., http://192.168.1.100:11434): " remote_host
+        read -p "Enter Ollama host (e.g., http://192.168.x.x:11434): " remote_host
         if test_ollama_connection "$remote_host"; then
             log_success "Connected to Ollama at $remote_host"
             OLLAMA_DETECTED=true
