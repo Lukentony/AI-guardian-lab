@@ -1,5 +1,5 @@
-# AI Guardian Lab - Static Dangerous Patterns
-version: "1.0"
+# AI Guardian Lab - Dangerous Command Patterns
+version: "1.1"
 
 patterns:
   filesystem_destruction:
@@ -18,10 +18,33 @@ patterns:
     - pattern: ':\(\)\{\s*:\|:&\s*\};:'
       severity: critical
 
+  # SEC-05: Privilege escalation — no ^ anchor so sudo is caught mid-command
   privilege_escalation:
-    - pattern: 'sudo\s+su\s+-'
+    - pattern: 'sudo\s+su'
+      severity: high
+    - pattern: 'sudo\s+rm'
+      severity: critical
+    - pattern: 'sudo\s+cat\s+/etc/(shadow|passwd)'
+      severity: high
+    - pattern: 'sudo\s+chmod'
+      severity: high
+    - pattern: 'sudo\s+chown'
+      severity: high
+    - pattern: 'sudo\s+dd\s+'
+      severity: critical
+    - pattern: 'sudo\s+'
+      severity: high
+    - pattern: 'doas\s+'
+      severity: high
+    - pattern: 'pkexec\s+'
+      severity: high
+    - pattern: 'su\s+-c\s+'
+      severity: high
+    - pattern: 'chmod\s+[47][0-7][0-7]'
       severity: high
     - pattern: 'chmod\s+-R\s+777'
+      severity: high
+    - pattern: 'chown\s+root'
       severity: high
 
   remote_execution:
@@ -36,7 +59,7 @@ patterns:
     - pattern: 'find\s+/.*-exec\s+rm'
       severity: high
 
-  # SEC-03: Encoding Bypasses
+  # SEC-03: Encoding bypass detection
   encoding_bypass:
     - pattern: 'base64\s+-d'
       severity: critical
@@ -49,18 +72,31 @@ patterns:
     - pattern: 'openssl\s+enc\s+-d'
       severity: high
 
-  # SEC-05: Strict Privilege Escalation (Overrides older weak patterns)
-  strict_sudo:
-    - pattern: '^sudo\s+'
+  # SEC-03: Subshell / variable expansion detection
+  subshell_execution:
+    - pattern: '\$\('
       severity: high
-    - pattern: 'doas\s+'
+    - pattern: '`[^`]+`'
       severity: high
 
   # Exfiltration
   exfiltration:
     - pattern: 'nc\s+\d+\.\d+\.\d+\.\d+'
       severity: high
+    - pattern: '\|\s*nc\s+'
+      severity: high
     - pattern: 'curl\s+.*-X\s+POST'
       severity: medium
     - pattern: 'wget\s+--post-data'
+      severity: medium
+
+  # Sensitive file reads
+  sensitive_files:
+    - pattern: 'cat\s+/etc/(shadow|passwd|sudoers)'
+      severity: high
+    - pattern: '/etc/shadow'
+      severity: high
+    - pattern: 'printenv'
+      severity: medium
+    - pattern: '\benv\b\s*$'
       severity: medium

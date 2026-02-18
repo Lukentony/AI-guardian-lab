@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import requests
 import os
 import re
+import hmac
 from litellm import completion
 
 app = Flask(__name__)
@@ -14,14 +15,13 @@ API_KEY = os.getenv('API_KEY', '')
 
 def check_auth():
     if not API_KEY:
-        # FAIL SAFE: improved from "return True". If no key configured, we should warn but for this MVP we'll allow it with a big warning log.
-        # But to be "Senior", we should probably enforce it. Let's enforce it if not explicitly disabled.
-        # For now, let's keep it consistent with the "junior" vibe but make it explicit:
-        return True 
+        # FAIL CLOSED: reject all requests when no API_KEY is configured
+        print("WARNING: API_KEY not set — rejecting request (fail-closed)")
+        return False
 
     auth_header = request.headers.get('X-API-Key', '')
-    # Secure comparison (constant time ideally, but simple for now)
-    return auth_header == API_KEY
+    # Constant-time comparison to prevent timing attacks
+    return hmac.compare_digest(auth_header, API_KEY)
 
 def get_auth_headers():
     if API_KEY:

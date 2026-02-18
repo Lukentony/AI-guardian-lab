@@ -3,6 +3,8 @@ import yaml
 import re
 import os
 import base64
+import time
+import hmac
 import sqlite3
 from datetime import datetime
 
@@ -65,35 +67,72 @@ def log_to_db(task, command, status, reason, provider):
     except Exception as e:
         print(f"Error logging to DB: {e}")
 
+# --- In-memory rate limiter (SEC-02) ---
+GUARDIAN_RATE_LIMIT = 30  # requests per minute per IP
+_rate_counts = {}
+
+def is_rate_limited(ip):
+    current_time = int(time.time())
+    window = current_time // 60
+    key = (ip, window)
+    count = _rate_counts.get(key, 0)
+    if count >= GUARDIAN_RATE_LIMIT:
+        return True
+    _rate_counts[key] = count + 1
+    # Garbage-collect old windows
+    if len(_rate_counts) > 500:
+        for k in list(_rate_counts.keys()):
+            if k[1] < window:
+                del _rate_counts[k]
+    return False
+
 def check_auth():
     if not API_KEY:
-        # FAIL SAFE: explicitly allow only if intended, otherwise warn.
-        # For now we keep it open but log heavily as per previous logic, 
-        # but in a real scenario we'd return False.
-        return True
-    
+        # FAIL CLOSED: reject all requests when no API_KEY is configured
+        print("WARNING: API_KEY not set — rejecting request (fail-closed)")
+        return False
+
     auth_header = request.headers.get('X-API-Key', '')
-    # Simple secure check
-    if auth_header == API_KEY:
-        return True
-    
-    return False
+    # Constant-time comparison to prevent timing attacks
+    return hmac.compare_digest(auth_header, API_KEY)
 
 def normalize_command(command):
     normalized = command
+    # Strip escape characters
     normalized = re.sub(r'\\(.)', r'\1', normalized)
+    # Normalize IFS variants
     normalized = re.sub(r'\$\{IFS\}', ' ', normalized)
+    normalized = re.sub(r"\$'\\t'", ' ', normalized)
+    normalized = re.sub(r"\$'\\n'", ' ', normalized)
+    # Collapse whitespace
     normalized = re.sub(r'\s+', ' ', normalized)
-    
+
+    # Decode base64 payloads: echo <b64> | base64 -d
     b64_pattern = r'echo\s+([A-Za-z0-9+/=]+)\s*\|\s*base64\s+-d'
     match = re.search(b64_pattern, normalized)
     if match:
         try:
             decoded = base64.b64decode(match.group(1)).decode('utf-8')
             normalized = normalized.replace(match.group(0), decoded)
-        except:
+        except Exception:
             pass
-    
+
+    # Decode hex payloads: echo <hex> | xxd -r -p  (SEC-03)
+    hex_pattern = r'echo\s+([0-9a-fA-F]+)\s*\|\s*xxd\s+-r\s+-p'
+    match = re.search(hex_pattern, normalized)
+    if match:
+        try:
+            decoded = bytes.fromhex(match.group(1)).decode('utf-8')
+            normalized = normalized.replace(match.group(0), decoded)
+        except Exception:
+            pass
+
+    # Expand $(...) subshells into visible markers so patterns can match inner content
+    # We don't execute them, but we strip the wrapper so the inner command is visible
+    normalized = re.sub(r'\$\((.+?)\)', r'\1', normalized)
+    # Same for backtick subshells
+    normalized = re.sub(r'`(.+?)`', r'\1', normalized)
+
     return normalized.strip()
 
 patterns = []
@@ -134,6 +173,11 @@ def health():
 
 @app.route('/validate', methods=['POST'])
 def validate():
+    # SEC-02: Rate limiting
+    client_ip = request.remote_addr
+    if is_rate_limited(client_ip):
+        return jsonify({"error": "Too Many Requests", "retry_after": 60}), 429
+
     if not check_auth():
         return jsonify({"error": "Unauthorized"}), 401
     
@@ -152,10 +196,14 @@ def validate():
 
 @app.route('/report', methods=['POST'])
 def report():
+    # SEC-02: Rate limiting
+    client_ip = request.remote_addr
+    if is_rate_limited(client_ip):
+        return jsonify({"error": "Too Many Requests", "retry_after": 60}), 429
+
     if not check_auth():
         return jsonify({"error": "Unauthorized"}), 401
     
-    # Optional: still allow direct reporting if needed, but /validate handles it now
     data = request.json
     return jsonify({"status": "logged"}), 200
 
