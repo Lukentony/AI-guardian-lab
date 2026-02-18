@@ -1,5 +1,5 @@
 # AI Guardian Lab - Dangerous Command Patterns
-version: "1.1"
+version: "1.2"
 
 patterns:
   filesystem_destruction:
@@ -47,16 +47,17 @@ patterns:
     - pattern: 'chown\s+root'
       severity: high
 
+  # ReDoS-safe: replaced .* with .*? (non-greedy)
   remote_execution:
-    - pattern: 'wget.*\|\s*sh'
+    - pattern: 'wget.*?\|\s*sh'
       severity: critical
-    - pattern: 'curl.*\|\s*bash'
+    - pattern: 'curl.*?\|\s*bash'
       severity: critical
     - pattern: 'eval\s+\$\('
       severity: high
 
   dangerous_find:
-    - pattern: 'find\s+/.*-exec\s+rm'
+    - pattern: 'find\s+/.*?-exec\s+rm'
       severity: high
 
   # SEC-03: Encoding bypass detection
@@ -67,7 +68,7 @@ patterns:
       severity: critical
     - pattern: 'perl\s+-e'
       severity: high
-    - pattern: 'python.*-c'
+    - pattern: 'python.*?-c'
       severity: high
     - pattern: 'openssl\s+enc\s+-d'
       severity: high
@@ -79,13 +80,13 @@ patterns:
     - pattern: '`[^`]+`'
       severity: high
 
-  # Exfiltration
+  # Exfiltration (ReDoS-safe: .*?)
   exfiltration:
     - pattern: 'nc\s+\d+\.\d+\.\d+\.\d+'
       severity: high
     - pattern: '\|\s*nc\s+'
       severity: high
-    - pattern: 'curl\s+.*-X\s+POST'
+    - pattern: 'curl\s+.*?-X\s+POST'
       severity: medium
     - pattern: 'wget\s+--post-data'
       severity: medium
