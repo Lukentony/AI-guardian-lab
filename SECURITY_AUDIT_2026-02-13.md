@@ -1,99 +1,103 @@
 # AI Guardian Lab - Security Audit Report
 
-**Date**: 2026-02-13
-**Status**: 6 Critical Issues Identified
+**Date**: 2026-02-13 (original) | **Updated**: 2026-02-18
+**Status**: 5/6 Issues Fixed ✅
 
-## VULNERABILITIES MATRIX
+## Vulnerabilities Matrix
 
-| ID | Issue | Severity | CVSS | Impact |
+| ID | Issue | Severity | CVSS | Status |
 |---|---|---|---|---|
-| SEC-01 | API Authentication Missing | CRITICAL | 9.8 | Remote Command Execution |
-| SEC-02 | Rate Limiting Absent | HIGH | 7.5 | DoS via LLM Flooding |
-| SEC-03 | Pattern Bypass (Encoding) | HIGH | 8.1 | Guardian Evasion |
-| SEC-04 | Secrets Exposure in Logs | MEDIUM | 6.5 | API Key Leakage |
-| SEC-05 | Privilege Escalation (sudo) | MEDIUM | 7.2 | Root Access |
-| SEC-06 | Command Injection (LLM) | LOW | 5.3 | Limited by Guardian |
+| SEC-01 | API Authentication Missing | CRITICAL | 9.8 | ✅ **FIXED** (2026-02-18) |
+| SEC-02 | Rate Limiting Absent | HIGH | 7.5 | ✅ **FIXED** (2026-02-18) |
+| SEC-03 | Pattern Bypass (Encoding) | HIGH | 8.1 | ✅ **FIXED** (2026-02-18) |
+| SEC-04 | Secrets Exposure in Logs | MEDIUM | 6.5 | ✅ **FIXED** (2026-02-18) |
+| SEC-05 | Privilege Escalation (sudo) | MEDIUM | 7.2 | ✅ **FIXED** (2026-02-18) |
+| SEC-06 | Command Injection (LLM) | LOW | 5.3 | ⚠️ OPEN |
 
 ---
 
-## SEC-01: API Authentication Missing (CRITICAL)
+## SEC-01: API Authentication — ✅ FIXED
 
-### Current State
-Lack of authentication allows any user on the network to send tasks for execution.
+**Fix applied**: `check_auth()` is now **fail-closed** in both `agent/main.py` and `guardian/main.py`. When `API_KEY` is not configured, all requests are rejected with 401. Authentication uses `hmac.compare_digest()` for constant-time comparison (timing-attack resistance).
 
-### Fix Required
-- Add API key validation middleware.
-- Implement token-based authentication.
-- IP whitelist for internal endpoints.
+**Residual risk**: API key is a shared secret (not per-user JWT). Acceptable for this lab project.
 
 ---
 
-## SEC-02: Rate Limiting Absent (HIGH)
+## SEC-02: Rate Limiting — ✅ FIXED
 
-### Attack Vector
-Flooding the endpoint with requests can saturate CPU and cause service unavailability.
+**Fix applied**: In-memory rate limiter added to Guardian (`/validate`, `/report`): 30 req/min per IP. Agent already had 60 req/min on `/execute`. Both use sliding-window counters with automatic garbage collection.
 
-### Fix Required
-- Implement request rate limiting (e.g., 10 req/min per IP).
-- Queue system for LLM requests.
+**Residual risk**: In-memory counters reset on container restart. Acceptable for non-production use.
 
 ---
 
-## SEC-03: Pattern Bypass via Encoding (HIGH)
+## SEC-03: Pattern Bypass via Encoding — ✅ FIXED
 
-### Attack Vectors
-- Base64 encoding bypasses.
-- Hex encoding bypasses.
-- Command injection via subshells or backticks.
+**Fix applied**:
+- `normalize_command()` now decodes **hex payloads** (`echo <hex> | xxd -r -p`) in addition to base64.
+- **Subshell expansion**: `$(...)` and backtick wrappers are stripped, exposing inner commands to pattern matching.
+- **IFS variants**: `$'\t'` and `$'\n'` are normalized.
+- **15+ new patterns** added to `patterns.yaml`: subshell detection, pipe-to-netcat, sensitive file reads (`/etc/shadow`, `/etc/passwd`), `printenv`.
 
-### Fix Required
-- Enhance regex patterns to detect encoding utilities (base64, xxd).
-- Implement deeper analysis for pipe and redirection characters.
-
----
-
-## SEC-04: Secrets Exposure in Logs (MEDIUM)
-
-### Current Behavior
-Commands containing API keys or passwords are logged in plain text.
-
-### Fix Required
-- Implement secret masking logic in the logging component.
-- Regex-based masking for common credential formats (sk-..., gsk_...).
+**Residual risk**: Exotic encodings (e.g., `printf '\x72\x6d'`) are not decoded. Deep encoding chains remain a theoretical risk.
 
 ---
 
-## SEC-05: Privilege Escalation (MEDIUM)
+## SEC-04: Secrets Exposure in Logs — ✅ FIXED
 
-### Current Gap
-Guardian only blocks a limited set of `sudo` use cases.
+**Fix applied**: `mask_secrets()` is now applied in both `guardian/main.py` (`log_to_db()`) and `database/audit_logger.py` (`log_command()`). API keys (sk-..., gsk_...), tokens, and passwords are replaced with `***MASKED***` before database writes.
 
-### Fix Required
-- Implement a stricter `sudo` policy.
-- Use explicit whitelisting for permitted administrative commands.
+**Additional fix**: Removed debug `print()` in `agent/main.py` that leaked the first 4 characters of `API_KEY` to stdout.
 
 ---
 
-## SEC-06: Command Injection via LLM (LOW)
+## SEC-05: Privilege Escalation (sudo) — ✅ FIXED
 
-### Risk
-If Guardian fails to validate, there is no final sanitization of the command string.
-
-### Fix Required
-- Implement a final command sanitizer to block forbidden characters like `;`, `&&`, `||`.
+**Fix applied**:
+- Removed `^` anchor from sudo patterns—now catches `sudo` mid-command (e.g., `&& sudo rm -rf /`).
+- Added patterns for: `sudo rm`, `sudo cat /etc/shadow`, `sudo chmod`, `sudo chown`, `sudo dd`, `pkexec`, `su -c`, `chown root`.
+- Broader `chmod` detection: `chmod 4xx/7xx` numeric patterns.
 
 ---
 
-## HARDENING ROADMAP
+## SEC-06: Command Injection via LLM — ⚠️ OPEN
 
-### Phase 1: Critical Fixes
-- SEC-01: API Authentication.
-- SEC-03: Pattern bypass detection.
+**Risk**: If Guardian pattern matching fails to catch a malicious command, there is no final sanitization layer before the command string is returned to the user.
 
-### Phase 2: High Priority
-- SEC-02: Rate limiting.
-- SEC-05: Sudo policy hardening.
+**Mitigation already in place**: The agent does **not** execute commands directly—it returns them in the API response. Actual execution is the caller's responsibility.
 
-### Phase 3: Medium Priority
-- SEC-04: Secrets masking.
-- SEC-06: Final command sanitizer.
+**Recommended future fix**: Add a final sanitizer that blocks or warns on chained commands (`;`, `&&`, `||`, `|`) unless explicitly allowed.
+
+---
+
+## Additional Findings (2026-02-18)
+
+| Finding | Severity | Status |
+|---|---|---|
+| Debug print leaking API_KEY prefix in agent | LOW | ✅ Fixed |
+| No CORS policy on Flask endpoints | INFO | Acceptable (internal Docker network) |
+| SQLite has no encryption at rest | INFO | Acceptable for lab use |
+| No TLS between containers | INFO | Acceptable (Docker bridge network) |
+
+---
+
+## Hardening Roadmap
+
+### ✅ Phase 1: Critical Fixes (COMPLETED)
+- SEC-01: Fail-closed API authentication
+- SEC-03: Pattern bypass detection
+
+### ✅ Phase 2: High Priority (COMPLETED)
+- SEC-02: Rate limiting on all endpoints
+- SEC-05: Comprehensive sudo/privilege escalation policy
+
+### ✅ Phase 3: Medium Priority (COMPLETED)
+- SEC-04: Secrets masking in all logging paths
+
+### ⏳ Phase 4: Future Improvements
+- SEC-06: Final command sanitizer (chain detection)
+- Per-user JWT authentication
+- SQLite encryption at rest (SQLCipher)
+- TLS between containers (mTLS)
+- CORS policy for production deployment

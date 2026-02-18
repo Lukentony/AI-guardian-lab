@@ -25,9 +25,7 @@ def check_auth():
 
 def get_auth_headers():
     if API_KEY:
-        print(f"DEBUG: sending API_KEY: {API_KEY[:4]}***")
         return {'X-API-Key': API_KEY}
-    print("DEBUG: No API_KEY set for outgoing request")
     return {}
 
 def clean_command(text):
