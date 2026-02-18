@@ -26,7 +26,7 @@
 
 ## SEC-02: Rate Limiting — ✅ FIXED
 
-**Fix applied**: In-memory rate limiter added to Guardian (`/validate`, `/report`): 30 req/min per IP. Agent already had 60 req/min on `/execute`. Both use sliding-window counters with automatic garbage collection.
+**Fix applied**: Migrated to `Flask-Limiter` for standard, robust rate limiting on `/validate` and `/report` (60 req/min). Integrated with `memory://` storage for low-latency sliding window counters.
 
 **Residual risk**: In-memory counters reset on container restart. Acceptable for non-production use.
 
@@ -35,10 +35,11 @@
 ## SEC-03: Pattern Bypass via Encoding — ✅ FIXED
 
 **Fix applied**:
+- **ReDoS Protection (Phase 2)**: All regex patterns are executed with a **1.0 second timeout** using `concurrent.futures`. Excessive processing time triggers automatic rejection.
 - `normalize_command()` now decodes **hex payloads** (`echo <hex> | xxd -r -p`) in addition to base64.
 - **Subshell expansion**: `$(...)` and backtick wrappers are stripped, exposing inner commands to pattern matching.
 - **IFS variants**: `$'\t'` and `$'\n'` are normalized.
-- **15+ new patterns** added to `patterns.yaml`: subshell detection, pipe-to-netcat, sensitive file reads (`/etc/shadow`, `/etc/passwd`), `printenv`.
+- **15+ new patterns** added to `patterns.yaml`, now using non-greedy `.*?` quantifiers for safety.
 
 **Residual risk**: Exotic encodings (e.g., `printf '\x72\x6d'`) are not decoded. Deep encoding chains remain a theoretical risk.
 
@@ -54,10 +55,10 @@
 
 ## SEC-05: Privilege Escalation (sudo) — ✅ FIXED
 
-**Fix applied**:
-- Removed `^` anchor from sudo patterns—now catches `sudo` mid-command (e.g., `&& sudo rm -rf /`).
-- Added patterns for: `sudo rm`, `sudo cat /etc/shadow`, `sudo chmod`, `sudo chown`, `sudo dd`, `pkexec`, `su -c`, `chown root`.
-- Broader `chmod` detection: `chmod 4xx/7xx` numeric patterns.
+**Fix applied (Phase 2)**:
+- **Hardened Audit Logging**: The `guardian_reason` column no longer stores raw regex patterns from potentially untrusted files/sources. It now stores a **category name** (e.g., `filesystem_destruction`), preventing log injection attacks via pattern metadata.
+- Removed `^` anchor from sudo patterns—now catches `sudo` mid-command.
+- Added patterns for: `sudo rm`, `sudo cat /etc/shadow`, `pkexec`, `su -c`, `chown root`, broader `chmod` detection.
 
 ---
 
