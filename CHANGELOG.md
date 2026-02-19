@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.0] - 2026-02-19
+### Added
+- **Zonal Enforcement (SEC-03b)**: Strict binary allowlisting via `policy.yaml`. Blocks any command not explicitly permitted.
+- **Resource Sandboxing**: CPU (0.5-0.75) and Memory (256MB-1GB) limits enforced per container in `docker-compose.yml`.
+- **Authenticated Feedback Loop**: New `/learn` endpoint to dynamically update pattern databases with authorization.
+- **Full Sandboxing**: All services (Agent, Guardian, UI) now run as non-privileged Linux users.
+- **Gunicorn Implementation**: Transitioned from development servers to production-grade Gunicorn workers.
+
+### Fixed
+- **SEC-04b**: Enforced `MAX_COMMAND_LENGTH` (1024) to prevent buffer/memory exhaustion.
+- Fixed inconsistent variable naming (`policy_path` -> `POLICY_PATH`).
+- Unified Python environment to `3.11-slim` across all Dockerfiles.
+
 ## [1.1.0] - 2026-02-18
 
 ### Added

@@ -1,0 +1,4 @@
+patterns:
+  test_category:
+    - pattern: 'test_pattern'
+      severity: medium

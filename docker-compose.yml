@@ -13,8 +13,13 @@ services:
       - ./guardian/config:/app/config:ro
       - ./database:/app/database
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/health')"]
+      test: [ "CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/health')" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -41,8 +46,13 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 1024M
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5001/health')"]
+      test: [ "CMD", "python", "-c", "import requests; requests.get('http://localhost:5001/health')" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -63,6 +73,11 @@ services:
     volumes:
       - ./database:/app/database:ro
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
     depends_on:
       - agent
       - guardian

@@ -3,7 +3,11 @@ version: "1.2"
 
 patterns:
   filesystem_destruction:
-    - pattern: 'rm\s+-rf\s+/'
+    - pattern: 'rm\s+(-[a-zA-Z]*r[a-zA-Z]*\s+)?-f\s+/'
+      severity: critical
+    - pattern: 'rm\s+--recursive\s+'
+      severity: critical
+    - pattern: 'rm\s+-rf\s+'
       severity: critical
     - pattern: 'mkfs\.'
       severity: critical

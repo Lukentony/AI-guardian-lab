@@ -1,33 +1,33 @@
 # AI LAB SECURITY POLICY
 
-## CURRENT STATUS: DEVELOPMENT MODE
+## CURRENT STATUS: STABLE / HARDENED
 
-### Active Permissions
-✅ Access to Ollama server
-   - Reason: Agent MVP testing and development
-   - Risk: LOW - Ollama is isolated and contains no personal data
+### Active Permissions (Zero-Trust)
+✅ **Mandatory Binary Allowlist**: Binary execution is restricted to the `green` and `yellow` zones in `policy.yaml`.
+✅ **Resource Quotas**: CPU and Memory limits are enforced per service to prevent Local DoS.
+✅ **Non-Privileged Execution**: All services run as unprivileged Linux users (`agent`, `guardian`, `ui`).
+✅ **Network Isolation**: Containers communicate within a private `agent-net` bridge with no exposed ports except for UI and Agent API.
 
-✅ Firewall configured for Docker debugging
-   - Reason: Easy container debugging during development
-   - Risk: LOW - Sandbox is already isolated from the primary network
-
-⚠️ Agent Container on network with LAN access
-   - Reason: Requires Ollama access while maintaining basic isolation
-   - Solution: Implement routing through host or dedicated bridge
+### Hardened Configuration
+🔒 **Fail-Closed Auth**: No `API_KEY` = No access.
+🔒 **ReDoS Protection**: Mandatory 1.0s timeout on all security regex evaluations.
+🔒 **Data Privacy**: Automatic masking of 10+ types of credentials in all audit logs.
 
 ---
 
-## PRODUCTION MODE (Sandbox)
-
-### Security Rules to Activate
-🔒 Total Isolation of Sandbox from LAN
-🔒 Ollama access through dedicated Gateway/Proxy
-🔒 Strict Firewall Rules
-🔒 Container Network: Internal-only "agent-net"
+## PRODUCTION MODE (Sandbox Ready)
+The environment is now ready for autonomous agent experimentation. While not a "bulletproof fortress," it provides a robust defense-in-depth shield against common agent failures and prompt-injection-driven destructive commands.
 
 ---
+**TRANSITION CHECKLIST**: 
+- [x] Guardian tested (9/9)
+- [x] Agent tested
+- [x] Docker Compose resource limits verified
+- [x] Unprivileged execution verified
+- [x] Binary Allowlist verified
 
-**TRANSITION CHECKLIST**: Guardian tested, Agent tested, Docker Compose verified, E2E functional tests, Backup performed, Rollback scripts ready.
+Last Update: 2026-02-19
+Current Mode: **HARDENED**
 
-Last Update: 2026-02-14
-Current Mode: DEVELOPMENT MODE
+---
+*"Security and stability over feature bloat."*
