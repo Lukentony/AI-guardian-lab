@@ -1,68 +1,41 @@
 # Deployment Guide
 
 ## Prerequisites
-- **Ubuntu 24.04** (Recommended)
-- **Docker + Docker Compose**
+- **Ubuntu 24.04** or any modern Linux/Windows/macOS with Docker.
+- **Docker + Docker Compose (V2)**
 - **Python 3.11+**
-- **Accessible Ollama Server**
+- **Accessible Ollama Server** (Local or Remote)
 
 ## Installation
 
 ```bash
 # 1. Clone the project
-cd /opt/ai-lab
+git clone https://github.com/Lukentony/ai-guardian-lab.git
+cd ai-guardian-lab
 
-# 2. Create Docker network
-docker network create --subnet=172.30.0.0/16 agent-net
+# 2. Build and Start the stack
+docker compose up -d
 
-# 3. Build images
-cd guardian && docker build -t guardian-mvp:latest .
-cd ../agent && docker build -t agent-mvp:latest .
-
-# 4. Start the stack
-cd /opt/ai-lab && docker-compose up -d
-
-# 5. Verify deployment
-docker-compose ps
-curl http://localhost:5000/health
+# 3. Verify deployment
+docker compose ps
 curl http://localhost:5001/health
 ```
 
-## Ollama Configuration
-The Agent requires `OLLAMA_URL` to be configured in `docker-compose.yml`:
-
-```yaml
-environment:
-  - OLLAMA_URL=http://<your-ollama-ip>:11434
-```
-
-## Operational Modes
-
-```bash
-# TEST MODE (Development)
-/opt/ai-lab/scripts/test-mode.sh
-
-# MAINTENANCE MODE (Updates)
-/opt/ai-lab/scripts/maintenance-mode.sh
-
-# Check Current Mode
-/opt/ai-lab/scripts/check-mode.sh
-```
+## Operational Guidelines
+The laboratory is designed to be **Fail-Closed**. 
+- Ensure your `API_KEY` is set in `.env`.
+- Review `guardian/config/policy.yaml` to allow necessary binaries.
 
 ## Troubleshooting
 
-### Containers won't start after iptables flush:
+### Network Issues
+Ensure `agent-net` is created by Docker Compose. If not:
 ```bash
-systemctl restart docker
-docker-compose up -d
+docker network create agent-net
 ```
 
-### Network `agent-net` not found:
-```bash
-docker network create --subnet=172.30.0.0/16 agent-net
-```
+### Unprivileged Permissions
+If the containers fail to write to the `database/` folder, ensure the host directory has write permissions for the container users (UID 1000/1001).
 
-### Ollama timeout:
-```bash
-/opt/ai-lab/scripts/wait-ollama.sh
-```
+---
+*"Security and stability over feature bloat."*
