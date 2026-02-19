@@ -20,15 +20,7 @@
 *Goal: Establish strict boundaries and adaptive security.*
 - [x] **Zonal Allowlisting**: Strict binary zones (Green/Yellow/Red) in `policy.yaml`.
 - [x] **Resource Quotas**: Hard CPU and Memory limits via Docker Compose.
-- [x] **Fail-Closed State**: Default reject policy for unknown binaries.
-- [x] **V1.1.2 Hardening**: Resolved normalization bypasses and and proof of execution.
-
-## Phase 4: Enterprise Readiness 🚀
-*Goal: Monitoring, scaling, and team collaboration.*
-- [ ] **Real-time Monitoring**: Dashboard for security events and performance.
-- [ ] **SIEM Integration**: Export logs to external platforms (ELK, Splunk).
-- [ ] **Capability Whitelisting**: Move beyond binary matching to flag-level control.
-- [ ] **Multi-tenant Auth**: JWT-based separation for teams.
+- [x] **V1.1.3 Hardening**: Resolved 6 architectural security gaps (DoS, Bypass, Persistence).
 
 ---
 *"Security and stability over feature bloat."*

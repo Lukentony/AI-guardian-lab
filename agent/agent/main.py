@@ -88,7 +88,11 @@ def execute():
     if not check_auth():
         return jsonify({"error": "Unauthorized"}), 401
     
-    task = request.json.get('task', '')
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({"error": "Invalid JSON or missing Content-Type"}), 400
+    
+    task = data.get('task', '')
     
     try:
         if LLM_PROVIDER == 'ollama':

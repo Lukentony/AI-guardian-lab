@@ -11,6 +11,7 @@ services:
       - API_KEY=${API_KEY}
     volumes:
       - ./guardian/config:/app/config:ro
+      - ./guardian/learned:/app/learned:rw
       - ./database:/app/database
     restart: unless-stopped
     deploy:

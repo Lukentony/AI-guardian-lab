@@ -1,7 +1,7 @@
 # AI Guardian Lab
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1.3-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-green.svg)
 ![Docker](https://img.shields.io/badge/docker--compose-blue.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
@@ -59,7 +59,7 @@ sequenceDiagram
 
 #### 1. Installation (Interactive Wizard)
 ```bash
-git clone https://github.com/your-username/ai-guardian-lab.git
+git clone https://github.com/Lukentony/AI-guardian-lab.git
 cd ai-guardian-lab
 ./install.sh
 

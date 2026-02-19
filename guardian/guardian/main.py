@@ -7,6 +7,8 @@ import time
 import hmac
 import sqlite3
 import logging
+import threading
+import shlex
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from flask_limiter import Limiter
@@ -29,12 +31,17 @@ limiter = Limiter(
     storage_uri="memory://",
 )
 
+# SEC-04b / BUG-05: Protection against pool saturation
+MAX_CONCURRENT_VALIDATIONS = 10
+_validation_semaphore = threading.Semaphore(MAX_CONCURRENT_VALIDATIONS)
+
 
 API_KEY = os.getenv('API_KEY', '')
 DB_PATH = os.getenv('DB_PATH', "/app/database/audit.db")
 PATTERNS_PATH = os.getenv('PATTERNS_PATH', '/app/config/patterns.yaml')
 POLICY_PATH = os.getenv('POLICY_PATH', '/app/config/policy.yaml')
-LEARNED_PATH = os.getenv('LEARNED_PATH', '/app/config/learned_patterns.yaml')
+# BUG-02: Write to a non-ro mount
+LEARNED_PATH = os.getenv('LEARNED_PATH', '/app/learned/learned_patterns.yaml')
 MAX_COMMAND_LENGTH = 1024 # SEC-04b
 
 def init_db():
@@ -95,11 +102,12 @@ def log_to_db(task, command, status, reason, provider):
     except Exception as e:
         logger.error(f"Error logging to DB: {e}")
 
-# --- ReDoS-safe regex compilation and execution (SEC-04b / Phase 2) ---
+# ReDoS-safe regex compilation and execution (SEC-04b / Phase 2)
 MAX_PATTERN_LENGTH = 200
 REGEX_TIMEOUT = 1.0  # seconds
 
-executor = ThreadPoolExecutor(max_workers=4)
+# BUG-05: Scale pool with CPU cores
+executor = ThreadPoolExecutor(max_workers=min(32, (os.cpu_count() or 1) * 4))
 
 def regex_match_with_timeout(pattern, text):
     """Run regex search with a timeout to prevent DoS."""
@@ -242,67 +250,94 @@ if os.path.exists(LEARNED_PATH):
         logger.warning(f"Failed to load learned patterns (non-fatal): {e}")
 
 
+def extract_binaries(command):
+    """BUG-04: Robustly extract all binaries from a command chain."""
+    # Pre-process message to ensure separators have spaces around them for shlex
+    separators = {';', '&&', '||', '|'}
+    for sep in separators:
+        command = command.replace(sep, f' {sep} ')
+    
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        tokens = command.split()
+    
+    binaries = []
+    take_next = True
+    
+    for token in tokens:
+        if token in separators:
+            take_next = True
+        elif take_next:
+            # Normalize path: ./rm -> rm
+            binaries.append(os.path.basename(token))
+            take_next = False
+    return binaries
 
 def validate_command(command):
-    # SEC-04b (Phase 2): Reject excessively long commands
-    if len(command) > MAX_COMMAND_LENGTH:
-        logger.warning(f"Command rejected: too long ({len(command)} chars)")
-        return False, f"Blocked: Command exceeds max length ({MAX_COMMAND_LENGTH} chars)"
+    # BUG-05: Concurrency Guard
+    acquired = _validation_semaphore.acquire(blocking=False)
+    if not acquired:
+        logger.warning("Guardian under high load: rejecting validation request")
+        return False, "Blocked: Guardian system under load, retry later"
     
-    normalized = normalize_command(command)
-    
-    # Phase 3 Enforcement: Strict Binary Allowlisting (SEC-03b)
-    # Extract the primary binary (first word of normalized command)
-    binary = normalized.split(' ')[0] if normalized else ''
-    
-    # 1. Get binary status from policy
-    zones = policy.get('zones', {})
-    green_binaries = zones.get('green', {}).get('binaries', [])
-    yellow_binaries = zones.get('yellow', {}).get('binaries', [])
-    red_binaries = zones.get('red', {}).get('binaries', [])
-    
-    # Logic:
-    # - If binary in green: Approved (unless regex blocks it)
-    # - If binary in yellow: Approved but logged (logged anyway by audit)
-    # - If binary in red: BLOCKED immediately
-    # - If binary NOT in any zone: BLOCKED (Fail-Closed) if mode is 'enforced'
-    
-    if binary in red_binaries:
-        return False, f"Blocked: Binary '{binary}' is in the RED zone (forbidden)"
-
-    # Mode check
-    strict_mode = policy.get('mode', 'permissive') == 'enforced'
-    
-    is_safe = (binary in green_binaries) or (binary in yellow_binaries)
-    
-    if strict_mode and not is_safe:
-        return False, f"Blocked: Binary '{binary}' is not in the allowlist (Fail-Closed)"
-
-    # Phase 1 Remediation: Dual-Path Validation
-    # We check both the raw command and the normalized version to prevent bypasses
-    # that might occur if normalization strips malicious tokens (like $(...) wrappers).
-    # Dual-Path Validation with Structural Awareness
-    # Patterns like subshell detection must check the RAW command before normalization
-    # potentially strips the wrappers.
-    for pattern, category, is_structural in patterns:
-        clean_category = category.replace('_', ' ').title()
+    try:
+        # SEC-04b (Phase 2): Reject excessively long commands
+        if len(command) > MAX_COMMAND_LENGTH:
+            logger.warning(f"Command rejected: too long ({len(command)} chars)")
+            return False, f"Blocked: Command exceeds max length ({MAX_COMMAND_LENGTH} chars)"
         
-        # 1. Always check the RAW command
-        if regex_match_with_timeout(pattern, command):
-            return False, f"Blocked (Security Policy) - Category: {clean_category}"
+        normalized = normalize_command(command)
         
-        # 2. Check NORMALIZED command only for non-structural patterns
-        # (Normalization intentionally strips structural shells, so checking them 
-        # against normalized text is redundant or 'dead code').
-        if not is_structural:
-            if regex_match_with_timeout(pattern, normalized):
-                return False, f"Blocked (Heuristic) - Category: {clean_category}"
+        # Phase 3 Enforcement: Strict Binary Allowlisting (SEC-03b)
+        # BUG-04: Check ALL binaries in the command chain
+        binaries = extract_binaries(normalized)
+        if not binaries and normalized:
+             # Fallback if shlex/split yielded nothing but string is not empty
+             binaries = [normalized.split(' ')[0]]
+
+        zones = policy.get('zones', {})
+        green_binaries = zones.get('green', {}).get('binaries', [])
+        yellow_binaries = zones.get('yellow', {}).get('binaries', [])
+        red_binaries = zones.get('red', {}).get('binaries', [])
+        strict_mode = policy.get('mode', 'permissive') == 'enforced'
+
+        for binary in binaries:
+            if binary in red_binaries:
+                return False, f"Blocked: Binary '{binary}' is in the RED zone (forbidden)"
             
-    return True, "Approved"
+            is_allowlisted = (binary in green_binaries) or (binary in yellow_binaries)
+            if strict_mode and not is_allowlisted:
+                return False, f"Blocked: Binary '{binary}' is not in the allowlist (Fail-Closed)"
+        
+        # Phase 1 Remediation: Dual-Path Validation
+        # We check both the raw command and the normalized version to prevent bypasses
+        # that might occur if normalization strips malicious tokens (like $(...) wrappers).
+        # Dual-Path Validation with Structural Awareness
+        # Patterns like subshell detection must check the RAW command before normalization
+        # potentially strips the wrappers.
+        for pattern, category, is_structural in patterns:
+            clean_category = category.replace('_', ' ').title()
+            
+            # 1. Always check the RAW command
+            if regex_match_with_timeout(pattern, command):
+                return False, f"Blocked (Security Policy) - Category: {clean_category}"
+            
+            # 2. Check NORMALIZED command only for non-structural patterns
+            # (Normalization intentionally strips structural shells, so checking them 
+            # against normalized text is redundant or 'dead code').
+            if not is_structural:
+                if regex_match_with_timeout(pattern, normalized):
+                    return False, f"Blocked (Heuristic) - Category: {clean_category}"
+                
+        return True, "Approved"
+    finally:
+        _validation_semaphore.release()
 
 @app.route('/health', methods=['GET'])
 def health():
-    return jsonify({"status": "healthy", "patterns_loaded": len(patterns)}), 200
+    # BUG-06: Information Disclosure hardening
+    return jsonify({"status": "healthy"}), 200
 
 @app.route('/validate', methods=['POST'])
 @limiter.limit("60 per minute")
@@ -368,7 +403,8 @@ def learn():
         return jsonify({"error": "Invalid or unsafe regex pattern"}), 400
         
     # 2. Add to in-memory patterns
-    patterns.append((compiled, "learned_pattern"))
+    # BUG-01: Fix tuple unpacking (add is_structural=False)
+    patterns.append((compiled, "learned_pattern", False))
     
     # 3. Persist to file
     try:

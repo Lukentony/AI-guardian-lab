@@ -23,9 +23,10 @@ The environment is now ready for autonomous agent experimentation. While not a "
 - [x] Guardian tested (9/9)
 - [x] Agent tested
 - [x] Docker Compose resource limits verified
+- [x] **V1.1.3 Patch**: Closed 6 architectural security gaps (DoS, Bypass, Persistence). 🛡️
 - [x] **V1.1.2 Patch**: Resolved 5 critical vulnerabilities reported in the security audit. 🛡️
 - [x] **Phase 3 Completion**: Hardened sandboxing and zonal allowlisting.
 
 Last Update: 2026-02-19
-Current ModState: **STABLE / HARDENED (V1.1.2)**
+Current ModState: **STABLE / HARDENED (V1.1.3)**
 Philosophy: *"Security and stability over feature bloat."*
