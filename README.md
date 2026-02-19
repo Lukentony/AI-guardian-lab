@@ -1,6 +1,7 @@
 # AI Guardian Lab
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-green.svg)
 ![Docker](https://img.shields.io/badge/docker--compose-blue.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
@@ -48,7 +49,7 @@ sequenceDiagram
     A-->>U: Result
 ```
 
-### 💎 Key Hardening Features (v1.2.0)
+### 💎 Key Hardening Features (v1.1.1)
 - **Extreme Sandboxing**: Containers run as non-privileged users with strict **CPU & Memory limits**.
 - **Dual-Path Validation**: Analyzes both raw and normalized commands to catch hex/base64 bypasses.
 - **Fail-Closed Policy**: Blocks every command by default unless explicitly allowed in `policy.yaml`.

@@ -25,7 +25,7 @@ This roadmap outlines the evolution of **AI Guardian Lab** from a security proto
 - [x] **Sandboxing**: All containers (Agent, Guardian, UI) run as unprivileged users.
 
 ## Phase 4: Maturity & Release 🚀 (Final Polish)
-- [ ] **GitHub Release v1.2.0**: Official tag and release documentation.
+- [ ] **GitHub Release v1.1.1**: Official tag and release documentation.
 - [ ] **Repo Cleanup**: Removing legacy `.working` and `.pre-test` files.
 - [ ] **Threat Model Verification**: Final confirmation of "Defense in Depth" strategy.
 

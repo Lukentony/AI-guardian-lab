@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.2.0] - 2026-02-19
+## [1.1.1] - 2026-02-19
 ### Added
 - **Zonal Enforcement (SEC-03b)**: Strict binary allowlisting via `policy.yaml`. Blocks any command not explicitly permitted.
 - **Resource Sandboxing**: CPU (0.5-0.75) and Memory (256MB-1GB) limits enforced per container in `docker-compose.yml`.
