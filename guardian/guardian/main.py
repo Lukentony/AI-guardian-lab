@@ -208,9 +208,10 @@ try:
                 if isinstance(pattern_list, list):
                     for p in pattern_list:
                         if isinstance(p, dict) and 'pattern' in p:
+                            is_structural = category in ['subshell_execution', 'encoding_bypass']
                             compiled = safe_compile(p['pattern'], source=category)
                             if compiled:
-                                patterns.append((compiled, category))
+                                patterns.append((compiled, category, is_structural))
 except Exception as e:
     logger.critical(f"CRITICAL: Failed to load patterns from {PATTERNS_PATH}: {e}")
     # Fail-secure: stop the application if static patterns cannot be loaded
@@ -234,7 +235,7 @@ if os.path.exists(LEARNED_PATH):
                     if isinstance(p, dict) and 'pattern' in p:
                         compiled = safe_compile(p['pattern'], source="learned")
                         if compiled:
-                            patterns.append((compiled, "learned_pattern"))
+                            patterns.append((compiled, "learned_pattern", False))
                             loaded_count += 1
                 logger.info(f"Loaded {loaded_count} learned patterns")
     except Exception as e:
@@ -280,17 +281,22 @@ def validate_command(command):
     # Phase 1 Remediation: Dual-Path Validation
     # We check both the raw command and the normalized version to prevent bypasses
     # that might occur if normalization strips malicious tokens (like $(...) wrappers).
-    for pattern, category in patterns:
-        # Category normalization for better reporting (SEC-05)
+    # Dual-Path Validation with Structural Awareness
+    # Patterns like subshell detection must check the RAW command before normalization
+    # potentially strips the wrappers.
+    for pattern, category, is_structural in patterns:
         clean_category = category.replace('_', ' ').title()
         
-        # Check raw command first
+        # 1. Always check the RAW command
         if regex_match_with_timeout(pattern, command):
-            return False, f"Blocked (Raw) by pattern: {clean_category}"
+            return False, f"Blocked (Security Policy) - Category: {clean_category}"
         
-        # Check normalized command
-        if regex_match_with_timeout(pattern, normalized):
-            return False, f"Blocked (Normalized) by pattern: {clean_category}"
+        # 2. Check NORMALIZED command only for non-structural patterns
+        # (Normalization intentionally strips structural shells, so checking them 
+        # against normalized text is redundant or 'dead code').
+        if not is_structural:
+            if regex_match_with_timeout(pattern, normalized):
+                return False, f"Blocked (Heuristic) - Category: {clean_category}"
             
     return True, "Approved"
 

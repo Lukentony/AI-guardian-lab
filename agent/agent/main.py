@@ -59,12 +59,14 @@ def run_command(command):
     try:
         # SEC-SAFE: We run the command via /bin/bash -c for flexibility, 
         # but within the containerized Agent environment.
+        print(f"--- EXECUTION START: {command} ---")
         result = subprocess.run(
             ["/bin/bash", "-c", command],
             capture_output=True,
             text=True,
             timeout=30
         )
+        print(f"--- EXECUTION COMPLETE (Code: {result.returncode}) ---")
         return {
             "stdout": result.stdout,
             "stderr": result.stderr,
@@ -73,6 +75,7 @@ def run_command(command):
     except subprocess.TimeoutExpired:
         return {"error": "Command timed out after 30s", "exit_code": 124}
     except Exception as e:
+        print(f"CRITICAL: Failed to execute command: {e}")
         return {"error": str(e), "exit_code": 1}
 
 @app.route('/health', methods=['GET'])

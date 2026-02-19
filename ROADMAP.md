@@ -1,13 +1,12 @@
-# Project Roadmap 🚀
+# AI Guardian Lab - Roadmap
 
-This roadmap outlines the evolution of **AI Guardian Lab** from a security prototype to a production-ready middleware.
-
-## Phase 1: Core Functionality & Integrity ✅
-*Goal: Ensure the system actually executes commands and validates them correctly.*
-- [x] **Command Execution**: Secure subprocess executor in the Agent.
-- [x] **Dual-Path Validation**: Matches patterns against *raw* and *normalized* commands.
-- [x] **Functional Audit**: Fixed `/report` and enabled SQLite **WAL Mode**.
-- [x] **Agnostic Engine**: Implemented case-insensitive regex matching.
+## Phase 1: Core Content Safety ✅
+*Goal: Protect against basic injection and malicious payloads.*
+- [x] **Regex-based filtering**: Blocking known dangerous commands.
+- [x] **LiteLLM Integration**: Support for 100+ LLM providers.
+- [x] **Dual-Language Support**: Documentation in English and Italian.
+- [x] **Audit Database**: Logging every command and task to SQLite.
+- [x] **Secret Masking**: Redacting API keys and tokens from logs.
 
 ## Phase 2: Operational Robustness ✅
 *Goal: Eliminate common failure points like crashes, race conditions, and lack of scale.*
@@ -18,16 +17,18 @@ This roadmap outlines the evolution of **AI Guardian Lab** from a security proto
 - [x] **Security Test Suite**: `Pytest` suite for logic verification.
 
 ## Phase 3: Advanced Sandboxing & Governance ✅
-*Goal: Secure the execution environment further and implement dynamic governance.*
-- [x] **Resource Guarding**: CPU/Memory limits enforced via Docker.
-- [x] **Policy Integration**: Mandatory binary allowlisting from `policy.yaml`.
-- [x] **Dynamic Feedback Loop**: Authenticated `/learn` endpoint implemented and verified.
-- [x] **Sandboxing**: All containers (Agent, Guardian, UI) run as unprivileged users.
+*Goal: Establish strict boundaries and adaptive security.*
+- [x] **Zonal Allowlisting**: Strict binary zones (Green/Yellow/Red) in `policy.yaml`.
+- [x] **Resource Quotas**: Hard CPU and Memory limits via Docker Compose.
+- [x] **Fail-Closed State**: Default reject policy for unknown binaries.
+- [x] **V1.1.2 Hardening**: Resolved normalization bypasses and and proof of execution.
 
-## Phase 4: Maturity & Release 🚀 (Final Polish)
-- [ ] **GitHub Release v1.1.1**: Official tag and release documentation.
-- [ ] **Repo Cleanup**: Removing legacy `.working` and `.pre-test` files.
-- [ ] **Threat Model Verification**: Final confirmation of "Defense in Depth" strategy.
+## Phase 4: Enterprise Readiness 🚀
+*Goal: Monitoring, scaling, and team collaboration.*
+- [ ] **Real-time Monitoring**: Dashboard for security events and performance.
+- [ ] **SIEM Integration**: Export logs to external platforms (ELK, Splunk).
+- [ ] **Capability Whitelisting**: Move beyond binary matching to flag-level control.
+- [ ] **Multi-tenant Auth**: JWT-based separation for teams.
 
 ---
-*Note: This is a living document. We prioritize security and stability over feature bloat.*
+*"Security and stability over feature bloat."*
