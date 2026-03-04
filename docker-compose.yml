@@ -1,10 +1,11 @@
 version: '3.8'
-
 services:
   guardian:
     build:
       context: ./guardian
     container_name: lab-guardian
+    ports:
+      - "127.0.0.1:5000:5000"
     networks:
       - agent-net
     environment:
@@ -21,7 +22,7 @@ services:
           memory: 512M
     healthcheck:
       test: [ "CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/health')" ]
-      interval: 30s
+      interval: 300s
       timeout: 10s
       retries: 3
 
@@ -54,7 +55,7 @@ services:
           memory: 1024M
     healthcheck:
       test: [ "CMD", "python", "-c", "import requests; requests.get('http://localhost:5001/health')" ]
-      interval: 30s
+      interval: 300s
       timeout: 10s
       retries: 3
     depends_on:
@@ -65,14 +66,15 @@ services:
       context: ./ui
     container_name: lab-ui
     ports:
-      - "8080:8080"
+      - "8081:8080"
     networks:
       - agent-net
     environment:
       - AGENT_URL=http://agent:5001
       - GUARDIAN_URL=http://guardian:5000
+      - DB_PATH=/app/database/audit.db
     volumes:
-      - ./database:/app/database:ro
+      - ./database:/app/database:rw
     restart: unless-stopped
     deploy:
       resources:
