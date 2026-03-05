@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.1.4] - 2026-03-05
+### Fixed
+- **Critical**: Fixed `safe_compile()` producing invalid `.*??` double quantifiers when patterns already contained non-greedy `.*?`. Replaced naive `str.replace` with `re.sub` using negative lookahead, plus a sanitization pass. Restores 5 previously broken security patterns at startup.
+
 ## [1.1.3] - 2026-02-19
 ### Fixed
 - **Critical**: Resolved `ValueError` crash in `/validate` triggered by dynamic pattern learning (BUG-01).
