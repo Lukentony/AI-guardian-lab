@@ -181,9 +181,12 @@ def safe_compile(pattern_str, source="static"):
         logger.warning(f"Pattern too long ({len(pattern_str)} chars), skipping [{source}]: {pattern_str[:50]}...")
         return None
     # Block greedy .* which causes catastrophic backtracking
-    if '.*' in pattern_str:
-        # Replace .* with non-greedy .*?
-        safe_str = pattern_str.replace('.*', '.*?')
+    # Use re.sub with a lookahead to only replace .* that are NOT followed by ?
+    safe_str = re.sub(r'\.\*(?!\?)', '.*?', pattern_str)
+    # SEC-04b Remediation: also sanitize any invalid double non-greedy .*?? 
+    safe_str = safe_str.replace('.*??', '.*?')
+    
+    if safe_str != pattern_str:
         logger.info(f"Replaced greedy .* with .*? in pattern [{source}]: {pattern_str}")
         pattern_str = safe_str
     try:
