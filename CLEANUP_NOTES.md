@@ -1,5 +1,7 @@
 # Cleanup Notes
 
+**Status: RESOLVED — no action required**
+
 *To be reviewed and addressed after merging feat/intent-coherence.*
 
 - **Environment Config (.env)**: There are residual configurations for Groq (`GROQ_API_KEY`, `LLM_PROVIDER=groq`, `LLM_MODEL_CODER=groq/llama-...`) which are unused since NUC2 does not have direct internet access.
