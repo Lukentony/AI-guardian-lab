@@ -1,7 +1,8 @@
 services:
   guardian:
     build:
-      context: ./guardian
+      context: .
+      dockerfile: guardian/Dockerfile
     container_name: lab-guardian
     ports:
       - "127.0.0.1:5000:5000"
@@ -26,7 +27,6 @@ services:
       interval: 300s
       timeout: 10s
       retries: 3
-
   agent:
     build:
       context: ./agent
@@ -61,7 +61,6 @@ services:
       retries: 3
     depends_on:
       - guardian
-
   ui:
     build:
       context: ./ui
@@ -85,7 +84,6 @@ services:
     depends_on:
       - agent
       - guardian
-
 networks:
   agent-net:
     driver: bridge
