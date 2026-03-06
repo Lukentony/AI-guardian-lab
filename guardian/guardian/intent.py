@@ -100,7 +100,7 @@ def check_intent_llm(command: str, task: str) -> dict:
     Validates coherence using LLM for ambiguous cases.
     """
     model = os.getenv("INTENT_LLM_MODEL", "ollama/deepseek-coder-v2:16b")
-    api_base = os.getenv("OLLAMA_URL", "http://100.64.0.2:11434")
+    api_base = os.getenv("OLLAMA_URL", "http://localhost:11434")
     
     prompt = f"""You are a security validator. Given a task description and a shell command, determine if the command is coherent with the task.
 Respond ONLY with valid JSON: {{"coherent": bool, "confidence": float 0-1, "reason": "short string"}}
