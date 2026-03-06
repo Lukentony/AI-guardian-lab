@@ -20,7 +20,7 @@ sys.modules['litellm'] = MagicMock()
 
 # Import the functions directly
 # Now that we have dummy files, the import should succeed without mocking 'open'
-from guardian.guardian.main import normalize_command, validate_command
+from main import normalize_command, validate_command
 
 def test_normalize_command_ifs():
     assert normalize_command("ls${IFS}-la") == "ls -la"
@@ -42,7 +42,7 @@ def test_dual_path_validation():
         (re.compile(r'base64\s+-d', re.IGNORECASE), 'encoding_bypass', False)
     ]
     
-    import guardian.guardian.main as main
+    import main
     original_patterns = main.patterns
     main.patterns = test_patterns
     
@@ -64,7 +64,7 @@ def test_dual_path_validation():
         main.patterns = original_patterns
 
 def test_case_insensitive_matching():
-    import guardian.guardian.main as main
+    import main
     test_patterns = [(re.compile(r'sudo', re.IGNORECASE), 'privilege_escalation', False)]
     original_patterns = main.patterns
     main.patterns = test_patterns
@@ -78,14 +78,14 @@ def test_case_insensitive_matching():
 def test_command_length_limit():
     # MAX_COMMAND_LENGTH is 1024 by default in main.py
     # Let's ensure it's loaded
-    import guardian.guardian.main as main
+    import main
     long_command = "ls " + ("a" * 1100)
     approved, reason, _ = main.validate_command(long_command)
     assert approved is False
     assert "exceeds max length" in reason
 
 def test_secret_masking():
-    from guardian.guardian.main import mask_secrets
+    from main import mask_secrets
     raw = "My key is API_KEY: sk-1234567890abcdef12345678"
     masked = mask_secrets(raw)
     # The new aggressive masking replaces the token part including the Sk.

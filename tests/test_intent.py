@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(PROJECT_ROOT)
 
-from guardian.guardian.intent import classify_command, classify_task, check_intent_mapping, check_intent_llm
+from intent import classify_command, classify_task, check_intent_mapping, check_intent_llm
 
 def test_classify_command():
     assert classify_command("ls -la") == "read"
@@ -43,7 +43,7 @@ def test_check_intent_mapping():
     assert not res4["blocked"]
     assert res4["needs_llm"]
 
-@patch('guardian.guardian.intent.completion')
+@patch('intent.completion')
 def test_check_intent_llm(mock_completion):
     # Setup mock response for coherent true
     mock_response = MagicMock()
