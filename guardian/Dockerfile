@@ -13,6 +13,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY guardian/main.py .
+COPY guardian/intent.py .
 COPY config/ config/
 
 RUN chown -R guardian:guardian /app

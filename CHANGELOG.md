@@ -2,7 +2,15 @@
 
 ## [1.2.0] - 2026-03-06
 ### Added
-- **Security**: Added Intent Coherence validation (Layer 3 deterministic mapping + Layer 4 LLM fallback) to Guardian pipeline to verify that requested tasks match the actions being performed by the command. Includes intent source tracking in audit DB and API response.
+- **Security**: Added Layer 3: Intent Family Mapping deterministico — classifica task e command in famiglie di intento, blocca i conflitti senza chiamare LLM.
+- **Security**: Aggiunto Layer 4: LLM check con deepseek-coder-v2:16b via Ollama per i casi ambigui non classificabili dal mapping.
+- **Pipeline fail-fast**: i nuovi layer entrano solo se regex e policy approvano.
+- **intent_source nella risposta API**: "mapping", "llm", o "skip" per audit e debug.
+- Aggiunto `CLEANUP_NOTES.md` per refactoring futuro.
+
+### Fixed
+- Fix: import `intent` invece di `from . import intent` in `main.py`
+- Fix: `COPY guardian/intent.py` aggiunto al Dockerfile.
 
 ## [1.1.4] - 2026-03-05
 ### Fixed
