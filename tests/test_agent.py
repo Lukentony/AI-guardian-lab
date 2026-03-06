@@ -11,7 +11,10 @@ sys.modules['litellm'] = MagicMock()
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from agent.agent.main import clean_command
+try:
+    from agent.agent.main import clean_command
+except ModuleNotFoundError:
+    pytest.skip("modulo agent non disponibile in questo container", allow_module_level=True)
 
 @pytest.mark.skip(reason="Agent module is not available in the guardian container")
 def test_clean_command_markdown():
