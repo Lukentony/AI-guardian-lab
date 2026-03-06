@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.2.0] - 2026-03-06
+### Added
+- **Security**: Added Intent Coherence validation (Layer 3 deterministic mapping + Layer 4 LLM fallback) to Guardian pipeline to verify that requested tasks match the actions being performed by the command. Includes intent source tracking in audit DB and API response.
+
 ## [1.1.4] - 2026-03-05
 ### Fixed
 - **Critical**: Fixed `safe_compile()` producing invalid `.*??` double quantifiers when patterns already contained non-greedy `.*?`. Replaced naive `str.replace` with `re.sub` using negative lookahead, plus a sanitization pass. Restores 5 previously broken security patterns at startup.

@@ -14,6 +14,8 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
+from . import intent
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -62,6 +64,13 @@ def init_db():
     ''')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_timestamp ON command_log(timestamp)')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_status ON command_log(status)')
+    
+    # v1.2.0: Add intent_source column for intent coherence feature
+    try:
+        conn.execute('ALTER TABLE command_log ADD COLUMN intent_source TEXT DEFAULT NULL')
+    except sqlite3.OperationalError:
+        pass # Column likely already exists
+        
     conn.commit()
     conn.close()
     logger.info("Database initialized with WAL mode enabled")
@@ -85,7 +94,7 @@ def mask_secrets(text):
         text = re.sub(pattern, replacement, text)
     return text
 
-def log_to_db(task, command, status, reason, provider):
+def log_to_db(task, command, status, reason, provider, intent_source=None):
     try:
         # Mask secrets in command and task before logging
         safe_command = mask_secrets(command)
@@ -94,8 +103,8 @@ def log_to_db(task, command, status, reason, provider):
         # Add timeout to handle concurrent writes
         conn = sqlite3.connect(DB_PATH, timeout=10.0)
         conn.execute(
-            "INSERT INTO command_log (timestamp, task, command, status, llm_provider, guardian_reason) VALUES (?, ?, ?, ?, ?, ?)",
-            (datetime.utcnow().isoformat(), safe_task, safe_command, status, provider, reason)
+            "INSERT INTO command_log (timestamp, task, command, status, llm_provider, guardian_reason, intent_source) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (datetime.utcnow().isoformat(), safe_task, safe_command, status, provider, reason, intent_source)
         )
         conn.commit()
         conn.close()
@@ -277,18 +286,18 @@ def extract_binaries(command):
             take_next = False
     return binaries
 
-def validate_command(command):
+def validate_command(command, task=None):
     # BUG-05: Concurrency Guard
     acquired = _validation_semaphore.acquire(blocking=False)
     if not acquired:
         logger.warning("Guardian under high load: rejecting validation request")
-        return False, "Blocked: Guardian system under load, retry later"
+        return False, "Blocked: Guardian system under load, retry later", "system_load"
     
     try:
         # SEC-04b (Phase 2): Reject excessively long commands
         if len(command) > MAX_COMMAND_LENGTH:
             logger.warning(f"Command rejected: too long ({len(command)} chars)")
-            return False, f"Blocked: Command exceeds max length ({MAX_COMMAND_LENGTH} chars)"
+            return False, f"Blocked: Command exceeds max length ({MAX_COMMAND_LENGTH} chars)", "policy"
         
         normalized = normalize_command(command)
         
@@ -307,11 +316,11 @@ def validate_command(command):
 
         for binary in binaries:
             if binary in red_binaries:
-                return False, f"Blocked: Binary '{binary}' is in the RED zone (forbidden)"
+                return False, f"Blocked: Binary '{binary}' is in the RED zone (forbidden)", "allowlist"
             
             is_allowlisted = (binary in green_binaries) or (binary in yellow_binaries)
             if strict_mode and not is_allowlisted:
-                return False, f"Blocked: Binary '{binary}' is not in the allowlist (Fail-Closed)"
+                return False, f"Blocked: Binary '{binary}' is not in the allowlist (Fail-Closed)", "allowlist"
         
         # Phase 1 Remediation: Dual-Path Validation
         # We check both the raw command and the normalized version to prevent bypasses
@@ -324,16 +333,27 @@ def validate_command(command):
             
             # 1. Always check the RAW command
             if regex_match_with_timeout(pattern, command):
-                return False, f"Blocked (Security Policy) - Category: {clean_category}"
+                return False, f"Blocked (Security Policy) - Category: {clean_category}", "regex"
             
             # 2. Check NORMALIZED command only for non-structural patterns
             # (Normalization intentionally strips structural shells, so checking them 
             # against normalized text is redundant or 'dead code').
             if not is_structural:
                 if regex_match_with_timeout(pattern, normalized):
-                    return False, f"Blocked (Heuristic) - Category: {clean_category}"
+                    return False, f"Blocked (Heuristic) - Category: {clean_category}", "regex"
                 
-        return True, "Approved"
+        # Phase 3: Intent Coherence (v1.2.0 Layer 3 + 4)
+        intent_res = intent.check_intent_mapping(normalized, task)
+        if intent_res["blocked"]:
+            return False, intent_res["reason"], intent_res["intent_source"]
+            
+        if intent_res.get("needs_llm"):
+            llm_res = intent.check_intent_llm(normalized, task)
+            if llm_res["blocked"]:
+                return False, llm_res["reason"], llm_res["intent_source"]
+            return True, llm_res["reason"], llm_res["intent_source"]
+            
+        return True, "Approved", intent_res.get("intent_source", "mapping")
     finally:
         _validation_semaphore.release()
 
@@ -357,13 +377,13 @@ def validate():
     task = data.get('task', 'Unknown Task')
     provider = data.get('llm_provider', 'unknown')
     
-    approved, reason = validate_command(command)
+    approved, reason, intent_source = validate_command(command, task)
     
     # Log the result
     status = 'executed' if approved else 'rejected'
-    log_to_db(task, command, status, reason, provider)
+    log_to_db(task, command, status, reason, provider, intent_source)
     
-    return jsonify({"approved": approved, "reason": reason}), 200
+    return jsonify({"approved": approved, "reason": reason, "intent_source": intent_source}), 200
 
 @app.route('/report', methods=['POST'])
 @limiter.limit("60 per minute")
@@ -382,7 +402,7 @@ def report():
     reason = data.get('reason', 'External Report')
     provider = data.get('llm_provider', 'unknown')
     
-    log_to_db(task, command, status, reason, provider)
+    log_to_db(task, command, status, reason, provider, intent_source='report')
     
     return jsonify({"status": "logged"}), 200
 

@@ -38,8 +38,8 @@ def test_normalize_command_subshells():
 def test_dual_path_validation():
     # Mock patterns for testing
     test_patterns = [
-        (re.compile(r'rm\s+-rf', re.IGNORECASE), 'filesystem_destruction'),
-        (re.compile(r'base64\s+-d', re.IGNORECASE), 'encoding_bypass')
+        (re.compile(r'rm\s+-rf', re.IGNORECASE), 'filesystem_destruction', False),
+        (re.compile(r'base64\s+-d', re.IGNORECASE), 'encoding_bypass', False)
     ]
     
     import guardian.guardian.main as main
@@ -48,29 +48,29 @@ def test_dual_path_validation():
     
     try:
         # 1. Normal blocked command
-        approved, reason = validate_command("rm -rf /")
+        approved, reason, _ = validate_command("rm -rf /")
         assert approved is False
-        assert "Blocked (Raw)" in reason
+        assert "Blocked (Security Policy)" in reason
 
         # 2. Obfuscated command that normalization clears
-        approved, reason = validate_command("echo 726d202d7266202f | xxd -r -p")
+        approved, reason, _ = validate_command("echo 726d202d7266202f | xxd -r -p")
         assert approved is False
-        assert "Blocked (Normalized)" in reason
+        assert "Blocked (Heuristic)" in reason
         
         # 3. Safe command
-        approved, reason = validate_command("ls -la")
+        approved, reason, _ = validate_command("ls -la")
         assert approved is True
     finally:
         main.patterns = original_patterns
 
 def test_case_insensitive_matching():
     import guardian.guardian.main as main
-    test_patterns = [(re.compile(r'sudo', re.IGNORECASE), 'privilege_escalation')]
+    test_patterns = [(re.compile(r'sudo', re.IGNORECASE), 'privilege_escalation', False)]
     original_patterns = main.patterns
     main.patterns = test_patterns
     
     try:
-        approved, _ = validate_command("SUDO apt-get update")
+        approved, _, _ = validate_command("SUDO apt-get update")
         assert approved is False
     finally:
         main.patterns = original_patterns
@@ -80,7 +80,7 @@ def test_command_length_limit():
     # Let's ensure it's loaded
     import guardian.guardian.main as main
     long_command = "ls " + ("a" * 1100)
-    approved, reason = main.validate_command(long_command)
+    approved, reason, _ = main.validate_command(long_command)
     assert approved is False
     assert "exceeds max length" in reason
 
