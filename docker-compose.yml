@@ -33,7 +33,7 @@ services:
       context: ./agent
     container_name: lab-agent
     ports:
-      - "5001:5001"
+      - "127.0.0.1:5001:5001"
     networks:
       - agent-net
     extra_hosts:
