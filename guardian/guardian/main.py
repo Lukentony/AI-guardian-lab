@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-from . import intent
+import intent
 
 # Configure logging
 logging.basicConfig(
