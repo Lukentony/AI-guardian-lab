@@ -2,3 +2,4 @@ flask==3.0.3
 litellm==1.44.6
 flask-limiter==3.5.0
 gunicorn==22.0.0
+pytest==8.3.5
