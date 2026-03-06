@@ -2,15 +2,15 @@
 
 ## [1.2.0] - 2026-03-06
 ### Added
-- **Security**: Added Layer 3: Intent Family Mapping deterministico — classifica task e command in famiglie di intento, blocca i conflitti senza chiamare LLM.
-- **Security**: Aggiunto Layer 4: LLM check con deepseek-coder-v2:16b via Ollama per i casi ambigui non classificabili dal mapping.
-- **Pipeline fail-fast**: i nuovi layer entrano solo se regex e policy approvano.
-- **intent_source nella risposta API**: "mapping", "llm", o "skip" per audit e debug.
-- Aggiunto `CLEANUP_NOTES.md` per refactoring futuro.
+- **Intent Coherence Layer (L4)**: deterministic task/command family mapping — blocks conflicts without LLM calls.
+- **LLM Semantic Check (L5)**: called only for ambiguous cases unresolved by the mapping.
+- **`intent_source` field in API response**: "mapping", "llm", or "skip" for audit transparency.
 
 ### Fixed
-- Fix: import `intent` invece di `from . import intent` in `main.py`
-- Fix: `COPY guardian/intent.py` aggiunto al Dockerfile.
+- Removed hardcoded private IP from `OLLAMA_URL` default fallback in `intent.py`.
+- Fixed relative import error in `main.py` for Gunicorn compatibility.
+- Added `pytest` to guardian requirements for container test execution.
+- Fixed Docker build context to include `tests/` directory.
 
 ## [1.1.4] - 2026-03-05
 ### Fixed
@@ -51,4 +51,4 @@
 - **Universal Provider Support**: Full integration with LiteLLM for Ollama, OpenAI, Groq, and DeepSeek.
 
 ---
-*"Security and stability over feature bloat."*
+*"Security first. Because you can't control the randomness of an LLM with another random LLM."*
