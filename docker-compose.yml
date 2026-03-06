@@ -10,6 +10,8 @@ services:
       - agent-net
     environment:
       - API_KEY=${API_KEY}
+      - INTENT_LLM_MODEL=${INTENT_LLM_MODEL}
+      - OLLAMA_URL=${OLLAMA_URL}
     volumes:
       - ./guardian/config:/app/config:ro
       - ./guardian/learned:/app/learned:rw
