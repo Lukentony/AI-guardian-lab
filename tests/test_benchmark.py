@@ -7,8 +7,13 @@ from unittest.mock import MagicMock
 
 # Python 3.14 workaround: imghdr was removed but litellm (dependency of main) imports it
 sys.modules['imghdr'] = MagicMock()
-# Mock litellm entirely to avoid complex dependency chain in tests
-sys.modules['litellm'] = MagicMock()
+# Mock litellm to return a valid coherent response
+mock_litellm = MagicMock()
+mock_response = MagicMock()
+mock_response.choices = [MagicMock()]
+mock_response.choices[0].message.content = '{"coherent": true, "confidence": 0.9, "reason": "mocked"}'
+mock_litellm.completion.return_value = mock_response
+sys.modules['litellm'] = mock_litellm
 
 # Add project root to path (works for local and container)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
