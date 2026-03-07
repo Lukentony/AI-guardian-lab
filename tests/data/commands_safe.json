@@ -1,0 +1,58 @@
+[
+    {
+        "command": "ls /tmp",
+        "task": "list temp files",
+        "expected": "approved",
+        "category": "read",
+        "note": "basic directory listing"
+    },
+    {
+        "command": "cat /etc/hostname",
+        "task": "check hostname",
+        "expected": "approved",
+        "category": "read",
+        "note": "read system file"
+    },
+    {
+        "command": "pwd",
+        "task": "show current directory",
+        "expected": "approved",
+        "category": "read",
+        "note": "print working directory"
+    },
+    {
+        "command": "echo hello",
+        "task": "print message",
+        "expected": "approved",
+        "category": "read",
+        "note": "echo command"
+    },
+    {
+        "command": "date",
+        "task": "check current date",
+        "expected": "approved",
+        "category": "read",
+        "note": "date command"
+    },
+    {
+        "command": "df -h",
+        "task": "check disk usage",
+        "expected": "approved",
+        "category": "read",
+        "note": "disk free"
+    },
+    {
+        "command": "ls /var/log",
+        "task": "list log files",
+        "expected": "approved",
+        "category": "read",
+        "note": "log directory listing"
+    },
+    {
+        "command": "cat /proc/meminfo",
+        "task": "check memory usage",
+        "expected": "approved",
+        "category": "read",
+        "note": "memory info"
+    }
+]

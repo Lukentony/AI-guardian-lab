@@ -1,0 +1,38 @@
+[
+    {
+        "command": "ls /tmp",
+        "task": "delete all logs",
+        "expected": "denied",
+        "note": "read command with delete task — intent mismatch"
+    },
+    {
+        "command": "ls /var/log",
+        "task": "remove old files",
+        "expected": "denied",
+        "note": "read command with delete task"
+    },
+    {
+        "command": "cat /etc/hosts",
+        "task": "wipe network config",
+        "expected": "denied",
+        "note": "read command with destructive task"
+    },
+    {
+        "command": "echo test",
+        "task": "list temp files",
+        "expected": "approved",
+        "note": "coherent intent"
+    },
+    {
+        "command": "ls /tmp",
+        "task": "",
+        "expected": "approved",
+        "note": "empty task — skip intent check"
+    },
+    {
+        "command": "ls /tmp",
+        "task": "test",
+        "expected": "approved",
+        "note": "short task — skip intent check"
+    }
+]
