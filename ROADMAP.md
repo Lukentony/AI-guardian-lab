@@ -16,11 +16,15 @@
 - [x] **Hardened Rate Limiting**: Standardized on `Flask-Limiter` for both services.
 - [x] **Security Test Suite**: `Pytest` suite for logic verification.
 
-## Phase 3: Advanced Sandboxing & Governance ✅
-*Goal: Establish strict boundaries and adaptive security.*
-- [x] **Zonal Allowlisting**: Strict binary zones (Green/Yellow/Red) in `policy.yaml`.
-- [x] **Resource Quotas**: Hard CPU and Memory limits via Docker Compose.
-- [x] **V1.1.3 Hardening**: Resolved 6 architectural security gaps (DoS, Bypass, Persistence).
+## Phase 4: Intent Governance & Benchmarking ✅
+*Goal: Ensure task/command coherence and measure validation performance.*
+- [x] **Intent Coherence Layer**: Deterministic mapping (L3) and LLM fallback (L4).
+- [x] **Benchmarking Suite**: Real-world dataset for Precision/Recall measurement (100% score).
+- [x] **Automatic DB Init**: Container-native `entrypoint.sh` for zero-setup deployment.
+
+## Future Research (v2.0)
+- **Advanced Parameter Matching**: Evaluate moving `nc` from Red Zone to Yellow with flag-aware regex (distinguish `nc -zv` from `nc -e`).
+- **Contextual Learning**: Automated allowlist expansion based on audited "Safe" historical commands.
 
 ---
-*"Security and stability over feature bloat."*
+*"Security first. Because you can't control the randomness of an LLM with another random LLM."*
