@@ -23,8 +23,17 @@ The Guardian operates a multi-layer validation pipeline. It is intentionally "Fa
 
 1.  **L1: Binary Allowlist**: I use a zonal policy (`green`, `yellow`, `red`). If a binary isn't explicitly permitted for the current context, it's dead on arrival.
 2.  **L2: Regex Pattern Matching**: A dual-path engine checks both raw and normalized commands against known dangerous patterns (obfuscation, exfiltration, ReDoS-safe checks).
-3.  **L3: Intent Coherence Mapping**: This is a deterministic layer I added to verify that the **command** actually matches the **task**. It classifies them into intent families (e.g., `read`, `write`, `delete`) and blocks conflicting intents (e.g., a "read" task generating a "delete" command) without ever calling an LLM.
-4.  **L4: LLM Semantic Check**: The LLM is my last resort. It's only called for ambiguous cases that the deterministic mapping can't resolve, adding a final layer of semantic understanding.
+3.  **L3: Intent Coherence Mapping**: This is the core differentiator of Guardian Lab. The problem it solves: an LLM can receive a task like *"read the config file"* and, due to hallucination or prompt injection, generate `rm -rf /etc/`. The task says "read". The command says "delete". No regex catches this, because `rm` in isolation might be legitimate in another context.
+
+    Instead of asking another LLM *"does this look right?"* (which reintroduces randomness), L3 maps both the task description and the command to a discrete intent family: `read`, `write`, `delete`, `network`, `execute`, `admin`. The mapping is a deterministic lookup: no model call, no probability, no temperature. If the intents conflict, the command is blocked immediately.
+```
+    Task:    "check which files are in /tmp"   → intent: read
+    Command: "rm -rf /tmp/*"                   → intent: delete
+
+    Result:  BLOCKED — intent mismatch (read ≠ delete)
+```
+
+4.  **L4: LLM Semantic Check**: The LLM is my last resort. It's only called when L3 returns `ambiguous`, covering cases where the same binary can legitimately serve multiple intents depending on context. This keeps LLM usage minimal and auditable.
 
 ### 🏗️ Architecture
 ```mermaid
