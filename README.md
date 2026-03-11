@@ -11,19 +11,6 @@
 
 ---
 
-# AI Guardian Lab
-
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)
-![Python](https://img.shields.io/badge/python-3.11+-green.svg)
-![Docker](https://img.shields.io/badge/docker--compose-blue.svg)
-![Status](https://img.shields.io/badge/status-stable-success.svg)
-
-> [!IMPORTANT]
-> **"Security first. Because you can't control the randomness of an LLM with another random LLM."**
-
----
-
 ## The Problem
 
 I wanted to use an AI agent on my machine, but I didn't trust giving it shell access without control. Current frameworks lack native enforcement on tools and rely almost exclusively on model compliance or fragile prompt engineering. I built Guardian as a deterministic intermediate layer to take the final decision-making power away from the LLM when it comes to executing commands on the system.
