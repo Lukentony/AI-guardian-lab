@@ -11,30 +11,43 @@
 
 ---
 
+# AI Guardian Lab
+
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)
+![Python](https://img.shields.io/badge/python-3.11+-green.svg)
+![Docker](https://img.shields.io/badge/docker--compose-blue.svg)
+![Status](https://img.shields.io/badge/status-stable-success.svg)
+
+> [!IMPORTANT]
+> **"Security first. Because you can't control the randomness of an LLM with another random LLM."**
+
+---
+
 ## The Problem
 
-Volevo usare un agente AI sulla mia macchina, ma non mi fidavo a dargli accesso alla shell senza controllo. I framework attuali non hanno un enforcement nativo sui tool e si affidano quasi esclusivamente alla compliance del modello o a prompt engineering fragile. Ho costruito Guardian come layer intermedio deterministico per togliere il potere decisionale finale all'LLM quando si tratta di eseguire comandi sul sistema.
+I wanted to use an AI agent on my machine, but I didn't trust giving it shell access without control. Current frameworks lack native enforcement on tools and rely almost exclusively on model compliance or fragile prompt engineering. I built Guardian as a deterministic intermediate layer to take the final decision-making power away from the LLM when it comes to executing commands on the system.
 
 ## How it works
 
-Il Guardian opera una pipeline di validazione a 4 layer. È "Fail-Closed" per design: se un layer ha un dubbio, il comando viene bloccato.
+The Guardian operates a 4-layer validation pipeline. It is "Fail-Closed" by design: if a layer has a doubt, the command is blocked.
 
-1.  **L1: Binary Allowlist**: Filtro immediato basato su zone di rischio (green, yellow, red). Se un binario non è esplicitamente permesso nel contesto attuale, l'esecuzione muore qui.
-2.  **L2: Regex Pattern Matching**: Un motore dual-path ReDoS-safe che controlla sia il comando raw che quello normalizzato contro pattern di offuscamento, esfiltrazione e distruzione.
-3.  **L3: Intent Coherence Mapping**: Questo è il differenziatore. Verifica che il comando sia coerente con il task assegnato classificandoli in famiglie di intenti (read, write, delete).
-    - *Esempio: task="analyze disk usage" + command="rm -rf /tmp" -> **BLOCKED** (conflitto tra intent 'read' e azione 'delete').*
-4.  **L4: LLM Semantic Check**: L'LLM è l'ultima risorsa. Viene interpellato solo per i casi ambigui che i layer deterministici non riescono a risolvere, aggiungendo un livello finale di comprensione semantica.
+1.  **L1: Binary Allowlist**: Immediate filter based on risk zones (green, yellow, red). If a binary is not explicitly permitted in the current context, the execution dies here.
+2.  **L2: Regex Pattern Matching**: A dual-path ReDoS-safe engine that checks both the raw and normalized command against patterns of obfuscation, exfiltration, and destruction.
+3.  **L3: Intent Coherence Mapping**: This is the differentiator. It verifies that the command is coherent with the assigned task by classifying them into intent families (read, write, delete).
+    - *Example: task="analyze disk usage" + command="rm -rf /tmp" -> **BLOCKED** (conflict between 'read' intent and 'delete' action).*
+4.  **L4: LLM Semantic Check**: The LLM is the last resort. It is consulted only for ambiguous cases that deterministic layers cannot resolve, adding a final level of semantic understanding.
 
 ## Why determinism first
 
-Ho dato priorità ai controlli deterministici rispetto alla validazione basata su LLM per tre motivi:
-- **Trasparenza**: Puoi auditare le regex e le mappature. Sai esattamente perché un comando è stato bloccato.
-- **Velocità**: I controlli deterministici richiedono millisecondi e zero token.
-- **Affidabilità**: La logica non "allucina". Offre un confine rigido che nessun prompt injection può saltare.
+I prioritized deterministic checks over LLM-based validation for three reasons:
+- **Transparency**: You can audit the regex and the mappings. You know exactly why a command was blocked.
+- **Speed**: Deterministic checks take milliseconds and require zero tokens.
+- **Reliability**: Logic does not "hallucinate". It offers a rigid boundary that no prompt injection can jump.
 
 ## The integration wall
 
-I framework per agenti bloccano per design le chiamate verso IP privati per protezione SSRF. È una scelta intenzionale e corretta, ma ha un effetto collaterale pesante: l'enforcement di Guardian oggi dipende dalla compliance del modello (che deve essere istruito a chiamare il middleware) e non da un hook hard nativo del framework. Questo è un problema aperto dell'intero ecosistema: l'enforcement automatico e inviolabile arriverà solo quando i framework implementeranno hook pre-tool nativi.
+Agent frameworks block calls to private IPs by design for SSRF protection. This is an intentional and correct choice, but it has a heavy side effect: Guardian's enforcement today depends on model compliance (which must be instructed to call the middleware) rather than a native hard hook in the framework. This is an open problem for the entire ecosystem: true, unbreakable automatic enforcement will only arrive when frameworks implement native pre-tool hooks.
 
 ## Quick Start
 
@@ -50,18 +63,18 @@ cd ai-guardian-lab
 docker-compose up -d
 ```
 
-## Use cases reali
+## Use cases
 
-- **Local Testing**: Sviluppatori che testano agenti AI localmente e vogliono capire cosa tentano di fare prima di dare accesso totale.
-- **Audit & Compliance**: Chi necessita di log immutabili di ogni singolo comando tentato da un agente, inclusi i rifiuti.
-- **Hard Chokepoint**: Chi vuole un filtro reale tra LLM e shell senza sperare che il modello "si comporti bene" seguendo le system instructions.
+- **Local Testing**: Developers testing AI agents locally who want to understand what they are trying to do before giving total access.
+- **Audit & Compliance**: Those who need immutable logs of every single command attempted by an agent, including rejections.
+- **Hard Chokepoint**: Those who want a real filter between the LLM and the shell without hoping the model "behaves well" by following system instructions.
 
 ## Threat Model & Limits
 
-Guardian è uno scudo, non un miracolo:
-1.  **Regex limitations**: Offuscamenti estremamente sofisticati potrebbero teoricamente evadere i pattern statici.
-2.  **Normalization**: La varietà della sintassi shell è un battleground costante; alcuni edge case potrebbero richiedere aggiornamenti alle regole di normalizzazione.
-3.  **Sandbox Dependency**: Guardian blocca i comandi, ma la sicurezza finale dipende anche dall'isolamento dell'ambiente (sandbox/docker) in cui l'agente gira.
+Guardian is a shield, not a miracle:
+1.  **Regex limitations**: Extremely sophisticated obfuscations could theoretically evade static patterns.
+2.  **Normalization**: The variety of shell syntax is a constant battleground; some edge cases may require updates to the normalization rules.
+3.  **Sandbox Dependency**: Guardian blocks commands, but final security also depends on the environment isolation (sandbox/docker) where the agent runs.
 
 ## Documentation
 - [Architecture & Layers](ARCHITECTURE.md)
@@ -71,4 +84,4 @@ Guardian è uno scudo, non un miracolo:
 ---
 
 ## 📄 License
-MIT License. Vedi [LICENSE](LICENSE) per i dettagli.
+MIT License. See [LICENSE](LICENSE) for details.
