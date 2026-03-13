@@ -48,7 +48,20 @@ The Guardian operates a 4-layer validation pipeline. It is "Fail-Closed" by desi
 
 1.  **L1: Binary Allowlist**: Immediate filter based on risk zones (green, yellow, red). If a binary is not explicitly permitted in the current context, the execution dies here.
 2.  **L2: Regex Pattern Matching**: A dual-path ReDoS-safe engine that checks both the raw and normalized command against patterns of obfuscation, exfiltration, and destruction.
-3.  **L3: Intent Coherence Mapping**: This is the differentiator. It verifies that the command is coherent with the assigned task by classifying them into intent families (read, write, delete).
+3. **L3: Intent Coherence Mapping**: This is the differentiator. It maps both the `task` field and the command to one of four intent families — `read`, `write`, `delete`, `network` — using a static keyword taxonomy, then checks for conflicts.
+
+   The mapping is deterministic: each family is defined by a fixed set of keywords and command verbs. A conflict is flagged when the task intent and the command intent belong to incompatible families.
+
+   | Task intent | Command intent | Result  |
+   |-------------|----------------|---------|
+   | read        | delete         | BLOCKED |
+   | read        | network        | BLOCKED |
+   | write       | delete         | BLOCKED |
+   | write       | read           | ALLOWED |
+   | delete      | delete         | ALLOWED |
+
+   Example: `task="analyze disk usage"` + `command="rm -rf /tmp"` → task maps to `read`, command maps to `delete` → **BLOCKED**.
+
 4.  **L4: LLM Semantic Check**: The LLM is the last resort. It is consulted only for ambiguous cases that deterministic layers cannot resolve, adding a final level of semantic understanding.
 
 ## See it in action
@@ -84,6 +97,8 @@ I prioritized deterministic checks over LLM-based validation for three reasons:
 - **Transparency**: You can audit the regex and the mappings. You know exactly why a command was blocked.
 - **Speed**: Deterministic checks take milliseconds and require zero tokens.
 - **Reliability**: Logic does not "hallucinate". It offers a rigid boundary that no prompt injection can jump.
+
+**On L4:** The LLM layer is not a fallback for cases the deterministic layers "couldn't handle" — it is a deliberate scope boundary. L1–L3 cover the known attack surface: known-bad binaries, known patterns, and intent conflicts with a clear mapping. L4 handles the residual: commands that are structurally valid, not matched by any pattern, and whose task-command relationship is ambiguous by design. In practice, L4 fires on fewer than 5% of requests. The LLM cannot override a block issued by L1–L3. The enforcement hierarchy is strictly one-directional.
 
 ## Benchmark
 
@@ -129,6 +144,44 @@ cd ai-guardian-lab
 #### 2. Start
 ```bash
 docker-compose up -d
+```
+
+### 3. Try it
+
+```bash
+# Block a dangerous command
+curl -s -X POST http://localhost:5000/validate \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{"command": "rm -rf /tmp", "task": "analyze disk usage"}'
+```
+
+```json
+{
+  "approved": false,
+  "layer": "L3",
+  "reason": "Intent conflict: task maps to 'read', command maps to 'delete'.",
+  "command": "rm -rf /tmp",
+  "task": "analyze disk usage"
+}
+```
+
+```bash
+# Allow a safe command
+curl -s -X POST http://localhost:5000/validate \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{"command": "df -h", "task": "analyze disk usage"}'
+```
+
+```json
+{
+  "approved": true,
+  "layer": null,
+  "reason": null,
+  "command": "df -h",
+  "task": "analyze disk usage"
+}
 ```
 
 ## Use cases
