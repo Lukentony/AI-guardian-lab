@@ -63,11 +63,11 @@ run_scenario() {
 
     # Parse response fields (no jq dependency — basic string parsing)
     approved=$(echo "$response" | grep -o '"approved": *[a-z]*' | head -1 | grep -o '[a-z]*$')
-    layer=$(echo "$response"   | grep -o '"layer": *"[^"]*"'    | head -1 | sed 's/.*"layer": *"//;s/"//')
+    layer=$(echo "$response"   | grep -o '"intent_source": *"[^"]*"'    | head -1 | sed 's/.*"intent_source": *"//;s/"//')
     reason=$(echo "$response"  | grep -o '"reason": *"[^"]*"'   | head -1 | sed 's/.*"reason": *"//;s/"//')
 
     # Handle null layer/reason
-    if [ -z "$layer" ] || echo "$response" | grep -q '"layer": *null'; then
+    if [ -z "$layer" ] || echo "$response" | grep -q '"intent_source": *null'; then
         layer="—"
     fi
     if [ -z "$reason" ] || echo "$response" | grep -q '"reason": *null'; then
