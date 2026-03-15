@@ -48,7 +48,7 @@ The Guardian operates a 4-layer validation pipeline. It is "Fail-Closed" by desi
 
 1.  **L1: Binary Allowlist**: Immediate filter based on risk zones (green, yellow, red). If a binary is not explicitly permitted in the current context, the execution dies here.
 2.  **L2: Regex Pattern Matching**: A dual-path ReDoS-safe engine that checks both the raw and normalized command against patterns of obfuscation, exfiltration, and destruction.
-3. **L3: Intent Coherence Mapping**: This is the differentiator. It maps both the `task` field and the command to one of four intent families — `read`, `write`, `delete`, `network` — using a static keyword taxonomy, then checks for conflicts.
+3. **L3. **Intent Coherence Mapping**: This is the differentiator. It maps both the `task` field and the command to one of four intent families — `read`, `write`, `delete`, `network` — using a static keyword taxonomy, then checks for conflicts. The taxonomy is intentionally minimal to keep deterministic rules auditable and predictable.
 
    The mapping is deterministic: each family is defined by a fixed set of keywords and command verbs. A conflict is flagged when the task intent and the command intent belong to incompatible families.
 
@@ -102,7 +102,7 @@ I prioritized deterministic checks over LLM-based validation for three reasons:
 
 ## Benchmark
 
-Evaluated on a dataset of 100 labeled commands (50 benign, 50 malicious).
+Evaluated on a synthetic dataset of 100 labeled commands (50 benign, 50 malicious), designed to cover the known attack surface of the current policy configuration.
 
 | Metric          | Score  |
 |-----------------|--------|
@@ -126,7 +126,7 @@ Results reflect the current policy configuration. Scores may vary with custom po
 | LLM as last resort only        | ✅              | ❌        | ❌            |
 | Audit log                      | ✅              | Partial   | Partial       |
 
-Comparison based on public documentation as of March 2026. LLM Guard and Guardrails AI are input/output scanners, not command-level enforcement layers — different use cases with some overlap.
+Comparison based on public documentation as of March 2026. LLM Guard and Guardrails AI are input/output scanners, not command-level enforcement layers — different design goals with some overlap. This table focuses exclusively on command-level enforcement capabilities.
 
 ## The integration wall
 
@@ -191,6 +191,12 @@ curl -s -X POST http://localhost:5000/validate \
 - **Hard Chokepoint**: Those who want a real filter between the LLM and the shell without hoping the model "behaves well" by following system instructions.
 
 ## Threat Model & Limits
+
+**Attacker model:** Guardian assumes an adversary who:
+- Injects malicious instructions through user-controlled input fields (prompt injection)
+- Obfuscates commands to evade pattern matching (encoding, variable expansion, chaining)
+- Attempts to exploit the gap between a task description and the actual command executed
+- Controls the LLM's output but cannot directly modify Guardian's configuration or policy files
 
 Guardian is a shield, not a miracle:
 1.  **Regex limitations**: Extremely sophisticated obfuscations could theoretically evade static patterns.
