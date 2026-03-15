@@ -50,11 +50,16 @@ run_scenario() {
     echo -e "  ${CYAN}Command:${NC} ${command}"
     echo ""
 
-    # Call the Guardian API
+    # Call the Guardian API (properly encoded JSON)
+    local body
+    body=$(printf '{"command": %s, "task": %s}' \
+        "$(printf '%s' "$command" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')" \
+        "$(printf '%s' "$task"   | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')")
+
     response=$(curl -s -X POST "${GUARDIAN_URL}/validate" \
         -H "Content-Type: application/json" \
         -H "X-API-Key: ${API_KEY}" \
-        -d "{\"command\": \"${command}\", \"task\": \"${task}\"}" 2>&1) || true
+        -d "$body" 2>&1) || true
 
     # Parse response fields (no jq dependency — basic string parsing)
     approved=$(echo "$response" | grep -o '"approved": *[a-z]*' | head -1 | grep -o '[a-z]*$')
