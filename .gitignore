@@ -42,3 +42,6 @@ workspace/
 # OS
 .DS_Store
 Thumbs.db
+pytest_output*.txt
+pytest_report*.txt
+.mode
