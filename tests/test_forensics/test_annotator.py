@@ -35,15 +35,15 @@ def test_annotation_risky():
     assert ann.operation_type == "exec"
 
 def test_annotation_unknown():
-    # Unknown binary should be yellow/2
+    # Unknown binary should be red/3 (fail-safe)
     event = ForensicsEvent(seq=0, timestamp=None, type="tool_call", content="", tool_name="bash", tool_input={"shell": "unknown_cmd"})
     session = ForensicsSession(session_id="1", framework="openhands", started_at=None, initial_task=None, events=[event])
     
     annotated = annotate_session(session)
     ann = annotated.events[0].annotation
     assert ann.binary == "unknown_cmd"
-    assert ann.policy_zone == "unknown"
-    assert ann.risk_score == 2
+    assert ann.policy_zone == "red"
+    assert ann.risk_score == 3
     assert ann.operation_type == "none"
 
 def test_annotation_non_tool():

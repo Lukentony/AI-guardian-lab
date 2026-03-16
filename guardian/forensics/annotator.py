@@ -110,8 +110,8 @@ def classify_zone(binary: str | None) -> tuple[str, int]:
     if binary in POLICY["red"]:
         return "red", 3
         
-    # Unknown binaries default to yellow/2
-    return "unknown", 2
+    # Unknown binaries default to red/3 (fail-safe)
+    return "red", 3
 
 def annotate_session(session: ForensicsSession) -> AnnotatedSession:
     """Normalizes and annotates all events in a session."""
