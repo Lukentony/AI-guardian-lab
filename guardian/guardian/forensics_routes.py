@@ -1,15 +1,14 @@
-# We import check_auth from main inside the route to avoid circular imports.
 from flask import Blueprint, request, jsonify
 from guardian.forensics.parser import parse_session
 from guardian.forensics.annotator import annotate_session
 from guardian.forensics.analyzer import analyze_session, AnalyzerConfig
 from guardian.forensics.report import generate_report
+from guardian.guardian.auth import check_auth
 
 forensics_bp = Blueprint('forensics', __name__)
 
 @forensics_bp.route('/forensics/analyze', methods=['POST'])
 def analyze():
-    from guardian.guardian.main import check_auth
     if not check_auth():
         return jsonify({"error": "Unauthorized"}), 401
     
@@ -30,7 +29,6 @@ def analyze():
         annotated = annotate_session(session)
         
         # 3. Analyze
-        # Use default AnalyzerConfig (uses dataclass defaults for Ollama)
         config = AnalyzerConfig()
         behavior_report = analyze_session(annotated, config)
         
