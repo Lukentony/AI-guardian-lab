@@ -1,0 +1,5 @@
+{"role": "system", "content": "You are a helpful assistant."}
+{"role": "user", "content": "List files in /tmp"}
+{"role": "assistant", "content": "I will list the files in /tmp for you.", "tool_calls": [{"id": "call_1", "type": "function", "function": {"name": "bash", "arguments": "{\"command\": \"ls /tmp\"}"}}]}
+{"role": "tool", "tool_call_id": "call_1", "content": "file1.txt\nfile2.txt"}
+{"role": "assistant", "content": "The files in /tmp are file1.txt and file2.txt."}
