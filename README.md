@@ -8,7 +8,7 @@
 
 AI agents can run shell commands on your machine. Guardian decides which ones actually run.
 
-Modern agent frameworks give LLMs direct access to the shell, yet security enforcement still relies almost entirely on model compliance. Relying on an LLM to follow system instructions is not a security boundary; it is a request. Guardian provides a deterministic enforcement layer that takes the final decision-making power away from the model.
+AI agent frameworks often provide LLMs with direct shell access to complete tasks. In most implementations, security relies entirely on the model's willingness to follow system instructions. But model compliance is not the same thing as security enforcement.
 
 ## See it in action
 
@@ -38,11 +38,11 @@ reason:  Ambiguous use of 'delete' is justified by the task intent 'clean temp f
 
 ## Why this exists
 
-The gap in current AI security is real and ecosystem-wide. No major agent framework currently ships with native, pre-tool enforcement mechanisms that verify commands before they reach the system. Most implementations depend on prompt engineering, but prompts are not a security boundary. Guardian solves this by acting as a hard chokepoint between the agent's intent and the system's execution. It ensures that the shell only processes what has been explicitly validated.
+The AI ecosystem has an enforcement gap. While we have tools to monitor inputs and outputs, no major agent framework ships with native, pre-tool execution control. Prompt engineering is often used as a defense, but it is a suggestion, not a secure boundary. Guardian solves this by providing a deterministic intermediate layer that removes final decision-making power from the LLM for system-level actions.
 
 ## How it works
 
-Guardian operates a 4-layer validation pipeline designed to be "Fail-Closed." If any layer flags a command as suspicious or contradictory, execution is blocked immediately.
+Guardian operates a 4-layer validation pipeline. It is "Fail-Closed" by design: if a layer has a doubt, the command is blocked.
 
 ```
  Agent Request
@@ -73,9 +73,7 @@ Guardian operates a 4-layer validation pipeline designed to be "Fail-Closed." If
 
 1.  **L1: Binary Allowlist**: Immediate filter based on risk zones (green, yellow, red). If a binary is not explicitly permitted in the current context, the execution dies here.
 2.  **L2: Regex Pattern Matching**: A dual-path ReDoS-safe engine that checks both the raw and normalized command against patterns of obfuscation, exfiltration, and destruction.
-3. **L3: Intent Coherence Mapping**: This is the differentiator. It maps both the `task` field and the command to one of four intent families — `read`, `write`, `delete`, `network` — using a static keyword taxonomy, then checks for conflicts. The taxonomy is intentionally minimal to keep deterministic rules auditable and predictable.
-
-    The mapping is deterministic: each family is defined by a fixed set of keywords and command verbs. A conflict is flagged when the task intent and the command intent belong to incompatible families.
+3.  **L3: Intent Coherence Mapping**: This is the differentiator. It maps both the `task` field and the command to one of four intent families — `read`, `write`, `delete`, `network` — using a static keyword taxonomy, then checks for conflicts. The taxonomy is intentionally minimal to keep deterministic rules auditable and predictable.
 
     | Task intent | Command intent | Result  |
     |-------------|----------------|---------|
