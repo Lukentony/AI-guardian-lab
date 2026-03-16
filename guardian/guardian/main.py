@@ -33,6 +33,10 @@ limiter = Limiter(
     storage_uri="memory://",
 )
 
+# Phase 5.5: Forensics API
+from .forensics_routes import forensics_bp
+app.register_blueprint(forensics_bp)
+
 # SEC-04b / BUG-05: Protection against pool saturation
 MAX_CONCURRENT_VALIDATIONS = 10
 _validation_semaphore = threading.Semaphore(MAX_CONCURRENT_VALIDATIONS)

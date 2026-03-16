@@ -1,0 +1,37 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.3, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\anton\ai-lab-test
+plugins: anyio-4.12.1, requests-mock-1.12.1
+collected 0 items / 1 error
+
+=================================== ERRORS ====================================
+_________ ERROR collecting tests/test_forensics/test_forensics_api.py _________
+ImportError while importing test module 'C:\Users\anton\ai-lab-test\tests\test_forensics\test_forensics_api.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_forensics\test_forensics_api.py:13: in <module>
+    from guardian.guardian.main import app
+guardian\guardian\main.py:17: in <module>
+    import intent
+guardian\guardian\intent.py:6: in <module>
+    from litellm import completion
+..\AppData\Local\Programs\Python\Python314\Lib\site-packages\litellm\__init__.py:780: in <module>
+    from .cost_calculator import completion_cost
+..\AppData\Local\Programs\Python\Python314\Lib\site-packages\litellm\cost_calculator.py:24: in <module>
+    from litellm.utils import (
+..\AppData\Local\Programs\Python\Python314\Lib\site-packages\litellm\utils.py:17: in <module>
+    import imghdr
+E   ModuleNotFoundError: No module named 'imghdr'
+============================== warnings summary ===============================
+..\AppData\Local\Programs\Python\Python314\Lib\site-packages\litellm\proxy\_types.py:1336
+  C:\Users\anton\AppData\Local\Programs\Python\Python314\Lib\site-packages\litellm\proxy\_types.py:1336: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class UserAPIKeyAuth(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+ERROR tests/test_forensics/test_forensics_api.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+========================= 1 warning, 1 error in 2.36s =========================
