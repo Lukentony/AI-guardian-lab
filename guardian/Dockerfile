@@ -8,6 +8,9 @@ COPY guardian/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY guardian/guardian/main.py .
 COPY guardian/guardian/intent.py .
+COPY guardian/guardian/auth.py .
+COPY guardian/guardian/forensics_routes.py .
+COPY guardian/forensics/ forensics/
 COPY guardian/schema.sql .
 COPY guardian/entrypoint.sh .
 COPY guardian/config/ config/

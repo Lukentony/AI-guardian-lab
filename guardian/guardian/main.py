@@ -4,7 +4,6 @@ import re
 import os
 import base64
 import time
-import hmac
 import sqlite3
 import logging
 import threading
@@ -15,6 +14,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 import intent
+from .auth import check_auth
 
 # Configure logging
 logging.basicConfig(
@@ -36,6 +36,7 @@ limiter = Limiter(
 # Phase 5.5: Forensics API
 from .forensics_routes import forensics_bp
 app.register_blueprint(forensics_bp)
+
 
 # SEC-04b / BUG-05: Protection against pool saturation
 MAX_CONCURRENT_VALIDATIONS = 10
@@ -134,15 +135,7 @@ def regex_match_with_timeout(pattern, text):
         logger.error(f"Regex error: {e}")
         return None
 
-def check_auth():
-    if not API_KEY:
-        # FAIL CLOSED: reject all requests when no API_KEY is configured
-        logger.critical("CRITICAL: API_KEY not set — rejecting request (fail-closed)")
-        return False
-
-    auth_header = request.headers.get('X-API-Key', '')
-    # Constant-time comparison to prevent timing attacks
-    return hmac.compare_digest(auth_header, API_KEY)
+# check_auth is now defined in auth.py and imported at the top of this file
 
 
 def normalize_command(command):
