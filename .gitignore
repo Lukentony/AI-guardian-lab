@@ -45,3 +45,5 @@ Thumbs.db
 pytest_output*.txt
 pytest_report*.txt
 .mode
+debug_imports.py
+pytest_*.txt
