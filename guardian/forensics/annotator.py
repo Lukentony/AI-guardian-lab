@@ -2,7 +2,7 @@ import os
 import yaml
 from dataclasses import dataclass
 from pathlib import Path
-from guardian.forensics.parser import ForensicsEvent, ForensicsSession
+from .parser import ForensicsEvent, ForensicsSession
 
 @dataclass
 class EventAnnotation:

@@ -14,7 +14,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 import intent
-from .auth import check_auth
+from auth import check_auth
 
 # Configure logging
 logging.basicConfig(
@@ -34,7 +34,7 @@ limiter = Limiter(
 )
 
 # Phase 5.5: Forensics API
-from .forensics_routes import forensics_bp
+from forensics_routes import forensics_bp
 app.register_blueprint(forensics_bp)
 
 
