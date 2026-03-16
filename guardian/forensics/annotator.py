@@ -28,7 +28,7 @@ READ_OPS = {"ls", "cat", "head", "tail", "grep", "find", "stat", "file", "wc", "
 WRITE_OPS = {"rm", "rmdir", "mv", "chmod", "chown", "dd", "shred", "mkfs", "fdisk", "useradd", "userdel", "passwd", "mkdir", "cp", "touch", "tee"}
 EXEC_OPS = {"bash", "sh", "python", "python3", "node", "ruby", "perl", "sudo", "su"}
 NETWORK_OPS = {"curl", "wget", "ssh", "scp", "rsync", "ping", "traceroute", "nmap", "nc"}
-CONTROL_OPS = {"kill", "pkill", "reboot", "shutdown", "halt", "systemctl", "docker", "iptables"}
+CONTROL_OPS = {"kill", "pkill", "reboot", "shutdown", "halt", "systemctl", "docker", "iptables", "sudo", "su"}
 
 def load_policy():
     """Load policy from YAML or fallback to defaults."""

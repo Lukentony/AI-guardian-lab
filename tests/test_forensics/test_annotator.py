@@ -25,14 +25,7 @@ def test_annotation_risky():
     assert ann.binary == "sudo"
     assert ann.policy_zone == "red"
     assert ann.risk_score == 3
-    assert ann.operation_type == "exec" # sudo is in EXEC_OPS and CONTROL_OPS, but EXEC is extracted here? Wait, priority CONTROL > EXEC.
-    # Let's check my code: sudo is in EXEC_OPS. Is it in CONTROL_OPS? No, briefing says:
-    # EXEC_OPS = {"bash", "sh", "python", "python3", "node", "ruby", "perl", "sudo", "su"}
-    # CONTROL_OPS = {"kill", "pkill", "reboot", "shutdown", "halt", "systemctl", "docker", "iptables"}
-    # Wait, briefing says sudo is EXEC. Let me re-read.
-    # Briefing: "If binary matches multiple categories (e.g. sudo), priority order: CONTROL > EXEC > WRITE > NETWORK > READ."
-    # My code has sudo in EXEC_OPS.
-    assert ann.operation_type == "exec"
+    assert ann.operation_type == "control"
 
 def test_annotation_unknown():
     # Unknown binary should be red/3 (fail-safe)
