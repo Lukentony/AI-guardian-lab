@@ -10,6 +10,9 @@ root = Path(__file__).parent.parent.parent.resolve()
 guardian_guardian_path = str(root / "guardian" / "guardian")
 if guardian_guardian_path not in sys.path:
     sys.path.append(guardian_guardian_path)
+guardian_path = str(root / "guardian")
+if guardian_path not in sys.path:
+    sys.path.append(guardian_path)
 if str(root) not in sys.path:
     sys.path.append(str(root))
 
@@ -45,8 +48,8 @@ def test_analyze_success(client):
         summary="Analysis completed successfully."
     )
 
-    with patch('guardian.guardian.forensics_routes.check_auth', return_value=True):
-        with patch('guardian.guardian.forensics_routes.analyze_session', return_value=mock_report):
+    with patch('forensics_routes.check_auth', return_value=True):
+        with patch('forensics_routes.analyze_session', return_value=mock_report):
             jsonl_content = (
                 '{"role": "user", "content": "analyze disk usage"}\n'
                 '{"role": "assistant", "tool_calls": [{"id": "1", "function": {"name": "bash", "arguments": "df -h"}}]}'
@@ -67,7 +70,7 @@ def test_analyze_success(client):
 
 def test_analyze_missing_field(client):
     """Test 400 error when jsonl field is missing."""
-    with patch('guardian.guardian.forensics_routes.check_auth', return_value=True):
+    with patch('forensics_routes.check_auth', return_value=True):
         response = client.post('/forensics/analyze', json={"not_jsonl": "data"})
         assert response.status_code == 400
         assert "error" in response.get_json()
@@ -75,15 +78,15 @@ def test_analyze_missing_field(client):
 
 def test_analyze_unauthorized(client):
     """Test 401 error when auth fails."""
-    with patch('guardian.guardian.forensics_routes.check_auth', return_value=False):
+    with patch('forensics_routes.check_auth', return_value=False):
         response = client.post('/forensics/analyze', json={"jsonl": "some content"})
         assert response.status_code == 401
         assert response.get_json()["error"] == "Unauthorized"
 
 def test_analyze_pipeline_failure(client):
     """Test 400 error when the pipeline raises an exception."""
-    with patch('guardian.guardian.forensics_routes.check_auth', return_value=True):
-        with patch('guardian.guardian.forensics_routes.parse_session', side_effect=Exception("Parsing failed")):
+    with patch('forensics_routes.check_auth', return_value=True):
+        with patch('forensics_routes.parse_session', side_effect=Exception("Parsing failed")):
             response = client.post('/forensics/analyze', json={"jsonl": "corrupt data"})
             assert response.status_code == 400
             assert response.get_json()["error"] == "Parsing failed"

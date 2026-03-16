@@ -1,9 +1,9 @@
 from flask import Blueprint, request, jsonify
-from guardian.forensics.parser import parse_session
-from guardian.forensics.annotator import annotate_session
-from guardian.forensics.analyzer import analyze_session, AnalyzerConfig
-from guardian.forensics.report import generate_report
-from guardian.guardian.auth import check_auth
+from forensics.parser import parse_session
+from forensics.annotator import annotate_session
+from forensics.analyzer import analyze_session, AnalyzerConfig
+from forensics.report import generate_report
+from auth import check_auth
 
 forensics_bp = Blueprint('forensics', __name__)
 
