@@ -1,4 +1,11 @@
 import pytest
+import sys
+from pathlib import Path
+
+root = Path(__file__).parent.parent.parent.resolve()
+guardian_path = str(root / "guardian")
+if guardian_path not in sys.path:
+    sys.path.append(guardian_path)
 from guardian.forensics.parser import ForensicsEvent, ForensicsSession
 from guardian.forensics.annotator import annotate_session
 
