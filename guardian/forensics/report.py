@@ -2,9 +2,9 @@ import json
 import uuid
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
-from guardian.forensics.parser import ForensicsEvent, ForensicsSession
-from guardian.forensics.annotator import AnnotatedEvent, AnnotatedSession
-from guardian.forensics.analyzer import BehaviorReport, AnalysisFlag
+from forensics.parser import ForensicsEvent, ForensicsSession
+from forensics.annotator import AnnotatedEvent, AnnotatedSession
+from forensics.analyzer import BehaviorReport, AnalysisFlag
 
 @dataclass
 class ForensicsReport:
