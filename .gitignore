@@ -45,3 +45,7 @@ Thumbs.db
 pytest_output*.txt
 pytest_report*.txt
 .mode
+
+# AI Guardian Lab cleanup
+debug_*.py
+pytest_*.txt
