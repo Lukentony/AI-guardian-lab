@@ -3,8 +3,8 @@ import urllib.request
 import urllib.error
 import sys
 from dataclasses import dataclass
-from guardian.forensics.parser import ForensicsEvent, ForensicsSession
-from guardian.forensics.annotator import AnnotatedEvent, AnnotatedSession
+from forensics.parser import ForensicsEvent, ForensicsSession
+from forensics.annotator import AnnotatedEvent, AnnotatedSession
 
 @dataclass
 class AnalysisFlag:
