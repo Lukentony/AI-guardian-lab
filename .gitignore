@@ -49,3 +49,4 @@ pytest_report*.txt
 # AI Guardian Lab cleanup
 debug_*.py
 pytest_*.txt
+*.bak
