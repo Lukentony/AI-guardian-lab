@@ -47,3 +47,4 @@ pytest_report*.txt
 .mode
 debug_imports.py
 pytest_*.txt
+*.bak
