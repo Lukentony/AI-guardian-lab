@@ -136,6 +136,32 @@ Comparison based on public documentation as of March 2026. LLM Guard and Guardra
 
 Agent frameworks block calls to private IPs by design for SSRF protection. This is an intentional and correct choice, but it has a heavy side effect: Guardian's enforcement today depends on model compliance (which must be instructed to call the middleware) rather than a native hard hook in the framework. This is an open problem for the entire ecosystem: true, unbreakable automatic enforcement will only arrive when frameworks implement native pre-tool hooks.
 
+## Forensics: Post-session Analysis
+
+Guardian also ships a post-mortem analysis module. While the validation pipeline intercepts commands in real time, the forensics module analyzes completed agent sessions to detect behavioral anomalies after the fact.
+
+It works with any agent framework that produces structured logs — not just Guardian-instrumented agents.
+
+**What it detects:**
+- **Tool escalation** — sessions where risk progresses from safe to dangerous commands
+- **Intent drift** — actions that diverge from the stated task
+- **Prompt injection signals** — tool outputs containing embedded instructions
+
+**Try it:**
+```bash
+bash demo_forensics.sh
+```
+
+**API:**
+```bash
+curl -s -X POST http://localhost:5000/forensics/analyze \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{"jsonl": "{\"role\": \"user\", \"content\": \"list files\"}\n..."}'
+```
+
+The response includes an anomaly score (0–100), per-flag analysis with confidence levels, and a human-readable summary.
+
 ## Quick Start
 
 #### 1. Installation
