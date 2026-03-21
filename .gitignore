@@ -50,5 +50,3 @@ pytest_report*.txt
 debug_*.py
 pytest_*.txt
 *.bak
-database/audit.db-shm
-database/audit.db-wal
