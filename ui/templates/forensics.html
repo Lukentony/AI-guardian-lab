@@ -16,12 +16,17 @@
         .nav a.active { background: #16c79a; color: #1a1a2e; }
 
         .form-section { background: #16213e; padding: 25px; border-radius: 12px; border: 2px solid #0f3460; margin-bottom: 30px; }
-        textarea { width: 100%; height: 250px; background: #1a1a2e; border: 1px solid #0f3460; border-radius: 8px; color: #ffd700; font-family: 'Courier New', monospace; padding: 15px; margin-bottom: 15px; resize: vertical; }
-        .btn-group { display: flex; gap: 10px; align-items: center; }
-        button { background: #16c79a; color: #1a1a2e; border: none; padding: 12px 30px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: 0.3s; }
+        textarea { width: 100%; height: 250px; background: #1a1a2e; border: 1px solid #0f3460; border-radius: 8px; color: #ffd700; font-family: 'Courier New', monospace; padding: 15px; margin-bottom: 10px; resize: vertical; }
+        
+        .hint { font-size: 0.85em; color: #888; margin-bottom: 15px; display: block; }
+        .hint b { color: #16c79a; }
+
+        .btn-group { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        button { background: #16c79a; color: #1a1a2e; border: none; padding: 12px 25px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: 0.3s; }
         button:hover { background: #4ecdc4; }
         .btn-secondary { background: #0f3460; color: #16c79a; border: 1px solid #16c79a; }
         .btn-secondary:hover { background: #16213e; }
+        .btn-upload { background: #4ecdc4; color: #1a1a2e; }
 
         .error { background: #ff6b6b; color: #fff; padding: 15px; border-radius: 8px; margin-bottom: 30px; font-weight: 600; }
 
@@ -70,12 +75,17 @@
         </div>
 
         <div class="form-section">
+            <span class="hint">💡 Accepted formats: <b>.json</b> (Array) or <b>.jsonl</b> (Lines). Max 1MB / 500 lines.</span>
             <form method="POST" id="forensicsForm">
-                <textarea name="jsonl_content" id="jsonl_content" placeholder="Paste JSONL session here (one JSON object per line) or use a sample... (Max 500 lines / 1MB)">{{ request.form.get('jsonl_content', '') }}</textarea>
+                <textarea name="jsonl_content" id="jsonl_content" placeholder="Paste content here or upload a file...">{{ request.form.get('jsonl_content', '') }}</textarea>
+                
+                <input type="file" id="fileInput" accept=".json,.jsonl" style="display:none" onchange="handleFileUpload(this)">
+                
                 <div class="btn-group">
                     <button type="submit">Analyze Session</button>
-                    <button type="button" class="btn-secondary" onclick="loadSample()">🎲 Load Random Example</button>
-                    <span id="sampleName" style="color: #aaa; font-style: italic; font-size: 0.9em;"></span>
+                    <button type="button" class="btn-upload" onclick="document.getElementById('fileInput').click()">📂 Upload File</button>
+                    <button type="button" class="btn-secondary" onclick="loadSample()">🎲 Random Example</button>
+                    <span id="statusMsg" style="color: #aaa; font-style: italic; font-size: 0.9em;"></span>
                 </div>
             </form>
         </div>
@@ -169,10 +179,44 @@
                 const response = await fetch('/forensics/random_sample');
                 const data = await response.json();
                 document.getElementById('jsonl_content').value = data.content;
-                document.getElementById('sampleName').innerText = "Loaded: " + data.name;
+                document.getElementById('statusMsg').innerText = "Loaded: " + data.name;
+                document.getElementById('statusMsg').style.color = "#16c79a";
             } catch (err) {
                 console.error("Failed to load sample", err);
             }
+        }
+
+        function handleFileUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            const status = document.getElementById('statusMsg');
+
+            // Format check
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (ext !== 'json' && ext !== 'jsonl') {
+                status.innerText = "Error: Only .json or .jsonl files allowed.";
+                status.style.color = "#ff6b6b";
+                input.value = ""; // Reset
+                return;
+            }
+
+            // Size check (1MB)
+            if (file.size > 1024 * 1024) {
+                status.innerText = "Error: File too large (Max 1MB).";
+                status.style.color = "#ff6b6b";
+                input.value = "";
+                return;
+            }
+
+            reader.onload = function(e) {
+                document.getElementById('jsonl_content').value = e.target.result;
+                status.innerText = "Uploaded: " + file.name;
+                status.style.color = "#16c79a";
+            };
+
+            reader.readAsText(file);
         }
     </script>
 </body>
