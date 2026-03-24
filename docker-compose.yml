@@ -72,6 +72,7 @@ services:
     environment:
       - AGENT_URL=http://agent:5001
       - GUARDIAN_URL=http://guardian:5000
+      - GUARDIAN_API_KEY=${API_KEY}
       - DB_PATH=/app/database/audit.db
     volumes:
       - ./database:/app/database:rw

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Guardian Lab - Forensics</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a2e; color: #eee; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { font-size: 2em; margin-bottom: 30px; color: #16c79a; }
+        
+        .nav { display: flex; gap: 10px; margin-bottom: 30px; border-bottom: 2px solid #0f3460; padding-bottom: 10px; }
+        .nav a { color: #aaa; text-decoration: none; padding: 8px 20px; border-radius: 8px; font-weight: 600; transition: 0.3s; }
+        .nav a:hover { background: #16213e; color: #16c79a; }
+        .nav a.active { background: #16c79a; color: #1a1a2e; }
+
+        .form-section { background: #16213e; padding: 25px; border-radius: 12px; border: 2px solid #0f3460; margin-bottom: 30px; }
+        textarea { width: 100%; height: 250px; background: #1a1a2e; border: 1px solid #0f3460; border-radius: 8px; color: #ffd700; font-family: 'Courier New', monospace; padding: 15px; margin-bottom: 15px; resize: vertical; }
+        button { background: #16c79a; color: #1a1a2e; border: none; padding: 12px 30px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #4ecdc4; }
+
+        .error { background: #ff6b6b; color: #fff; padding: 15px; border-radius: 8px; margin-bottom: 30px; font-weight: 600; }
+
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: #16213e; padding: 20px; border-radius: 12px; text-align: center; border: 2px solid #0f3460; }
+        .stat-card h3 { font-size: 0.9em; color: #aaa; text-transform: uppercase; margin-bottom: 10px; }
+        .stat-card .val { font-size: 2.5em; font-weight: 700; }
+        .score-red { color: #ff6b6b; }
+        .score-yellow { color: #ffd700; }
+        .score-green { color: #16c79a; }
+
+        .flags { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+        .flag-card { background: #16213e; padding: 20px; border-radius: 12px; border-left: 5px solid #0f3460; }
+        .flag-card.triggered { border-left-color: #ff6b6b; }
+        .flag-card.clear { border-left-color: #16c79a; }
+        .flag-card h4 { color: #16c79a; margin-bottom: 10px; font-size: 1.1em; }
+        .flag-status { font-weight: 800; font-size: 0.8em; padding: 3px 8px; border-radius: 4px; margin-left: 10px; }
+        .triggered .flag-status { background: #ff6b6b; color: #fff; }
+        .clear .flag-status { background: #16c79a; color: #1a1a2e; }
+        .flag-reason { font-size: 0.9em; color: #ccc; margin-top: 10px; }
+
+        table { width: 100%; background: #16213e; border-radius: 12px; overflow: hidden; border-collapse: collapse; margin-top: 20px; }
+        th { background: #0f3460; padding: 15px; text-align: left; color: #16c79a; font-weight: 600; }
+        td { padding: 12px 15px; border-bottom: 1px solid #0f3460; font-size: 0.9em; }
+        tr:hover { background: #1a2942; }
+        .zone { font-weight: 700; padding: 3px 8px; border-radius: 4px; }
+        .zone-trusted { background: #16c79a; color: #1a1a2e; }
+        .zone-neutral { background: #ffd700; color: #1a1a2e; }
+        .zone-untrusted { background: #ff6b6b; color: #fff; }
+        .tool { font-family: 'Courier New', monospace; font-weight: 700; color: #4ecdc4; }
+        .risk { font-weight: 800; }
+        .risk-high { color: #ff6b6b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔬 Forensics Analyzer</h1>
+
+        <div class="nav">
+            <a href="/">Dashboard</a>
+            <a href="/forensics" class="active">Forensics</a>
+        </div>
+
+        <div class="form-section">
+            <form method="POST">
+                <textarea name="jsonl_content" placeholder="Paste JSONL session here (one JSON object per line)...">{{ request.form.get('jsonl_content', '') }}</textarea>
+                <button type="submit">Analyze Session</button>
+            </form>
+        </div>
+
+        {% if error %}
+        <div class="error">
+            ⚠️ {{ error }}
+        </div>
+        {% endif %}
+
+        {% if report %}
+        <h2 style="margin-bottom: 20px; color: #16c79a;">📊 Analysis Results</h2>
+        
+        <!-- Section A: Summary -->
+        <div class="stats">
+            <div class="stat-card">
+                <h3>Anomaly Score</h3>
+                {% set score = report.summary.anomaly_score %}
+                <div class="val {% if score > 50 %}score-red{% elif score > 20 %}score-yellow{% else %}score-green{% endif %}">
+                    {{ score }}
+                </div>
+            </div>
+            <div class="stat-card">
+                <h3>Session ID</h3>
+                <div class="val" style="font-size: 1.2em; margin-top: 15px; color: #16c79a;">{{ report.summary.session_id[:12] }}...</div>
+            </div>
+            <div class="stat-card">
+                <h3>Events</h3>
+                <div class="val" style="color: #4ecdc4;">{{ report.summary.event_count }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Tool Calls</h3>
+                <div class="val" style="color: #4ecdc4;">{{ report.summary.tool_call_count }}</div>
+            </div>
+        </div>
+
+        <!-- Section B: Flags -->
+        <div class="flags">
+            {% for key, flag in report.flags.items() %}
+            <div class="flag-card {% if flag.triggered %}triggered{% else %}clear{% endif %}">
+                <h4>
+                    {{ key.replace('_', ' ').title() }}
+                    <span class="flag-status">{% if flag.triggered %}TRIGGERED{% else %}CLEAR{% endif %}</span>
+                </h4>
+                <div style="font-size: 0.85em; color: #aaa;">Confidence: {{ (flag.confidence * 100)|round|int }}%</div>
+                <div class="flag-reason">{{ flag.reason }}</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Section C: Timeline -->
+        <h2 style="margin-bottom: 20px; color: #16c79a;">🕵️ Event Timeline</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Seq</th>
+                    <th>Tool</th>
+                    <th>Binary</th>
+                    <th>Zone</th>
+                    <th>Risk</th>
+                    <th>Input Preview</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for event in report.timeline %}
+                <tr>
+                    <td>{{ event.seq }}</td>
+                    <td class="tool">{{ event.tool }}</td>
+                    <td>{{ event.binary or '-' }}</td>
+                    <td>
+                        <span class="zone zone-{{ event.zone }}">
+                            {{ event.zone.upper() }}
+                        </span>
+                    </td>
+                    <td class="risk {% if event.risk_score > 7 %}risk-high{% endif %}">{{ event.risk_score }}</td>
+                    <td style="color: #aaa; font-style: italic;">
+                        {{ event.input_preview[:100] }}{% if event.input_preview|length > 100 %}...{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </div>
+</body>
+</html>
