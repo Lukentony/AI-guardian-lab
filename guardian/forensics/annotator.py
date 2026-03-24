@@ -28,7 +28,7 @@ READ_OPS = {"ls", "cat", "head", "tail", "grep", "find", "stat", "file", "wc", "
 WRITE_OPS = {"rm", "rmdir", "mv", "chmod", "chown", "dd", "shred", "mkfs", "fdisk", "useradd", "userdel", "passwd", "mkdir", "cp", "touch", "tee"}
 EXEC_OPS = {"bash", "sh", "python", "python3", "node", "ruby", "perl", "sudo", "su"}
 NETWORK_OPS = {"curl", "wget", "ssh", "scp", "rsync", "ping", "traceroute", "nmap", "nc"}
-CONTROL_OPS = {"kill", "pkill", "reboot", "shutdown", "halt", "systemctl", "docker", "iptables", "sudo", "su"}
+CONTROL_OPS = {"kill", "pkill", "reboot", "shutdown", "halt", "systemctl", "docker", "iptables"}
 
 def load_policy():
     """Load policy from YAML or fallback to defaults."""
@@ -36,12 +36,12 @@ def load_policy():
     default_policy = {
         "green": ["ls", "cat", "pwd", "echo", "date"],
         "yellow": ["curl", "wget", "git"],
-        "red": ["rm", "mv", "chmod", "sudo"]
+        "red": ["rm", "mv", "chmod", "sudo", "ssh", "crontab"]
     }
-    
+
     if not policy_path.exists():
         return default_policy
-        
+
     try:
         with open(policy_path, "r") as f:
             data = yaml.safe_load(f)
@@ -60,31 +60,36 @@ def extract_binary(event: ForensicsEvent) -> str | None:
     """Extracts binary name from tool_call event."""
     if event.type != "tool_call":
         return None
-        
-    # Priority 1: Check tool_input keys
+
+    # DEBUG
+    print(f"DEBUG: Extracting binary for event {event.seq}")
+    print(f"DEBUG: tool_name='{event.tool_name}', tool_input={event.tool_input}, content='{event.content[:50]}'")
+
+    # Priority 1: Check tool_input keys (OpenClaw style)
     if event.tool_input:
         for key in ["command", "cmd", "bash", "shell"]:
             cmd = event.tool_input.get(key)
             if cmd and isinstance(cmd, str):
-                # Extract first token
                 parts = cmd.strip().split()
                 if parts:
-                    binary = parts[0]
-                    # Strip leading ./ or full paths
-                    binary = binary.split("/")[-1]
-                    return binary
-                    
-    # Priority 2: Fallback to tool_name if bash/shell
-    if event.tool_name in ["bash", "shell"]:
-        return "bash"
-        
+                    res = parts[0].split("/")[-1]
+                    print(f"DEBUG: Found binary in tool_input: {res}")
+                    return res
+
+    # Priority 2: Fallback to tool_name (OpenHands/SWE-agent style)
+    if event.tool_name:
+        res = event.tool_name.split("/")[-1]
+        print(f"DEBUG: Using tool_name as binary: {res}")
+        return res
+
+    print("DEBUG: No binary found!")
     return None
 
 def classify_operation(binary: str | None) -> str:
     """Classifies operation type based on binary."""
     if not binary:
         return "none"
-        
+
     if binary in CONTROL_OPS:
         return "control"
     if binary in EXEC_OPS:
@@ -95,21 +100,21 @@ def classify_operation(binary: str | None) -> str:
         return "network"
     if binary in READ_OPS:
         return "read"
-        
+
     return "none"
 
 def classify_zone(binary: str | None) -> tuple[str, int]:
     """Classifies risk zone and score based on binary."""
     if not binary:
         return "none", 0
-        
+
     if binary in POLICY["green"]:
         return "green", 1
     if binary in POLICY["yellow"]:
         return "yellow", 2
     if binary in POLICY["red"]:
         return "red", 3
-        
+
     # Unknown binaries default to red/3 (fail-safe)
     return "red", 3
 
@@ -118,13 +123,13 @@ def annotate_session(session: ForensicsSession) -> AnnotatedSession:
     annotated_events = []
     risk_progression = []
     max_risk = 0
-    
+
     for event in session.events:
         if event.type == "tool_call":
             binary = extract_binary(event)
             op_type = classify_operation(binary)
             zone, score = classify_zone(binary)
-            
+
             annotation = EventAnnotation(
                 operation_type=op_type,
                 policy_zone=zone,
@@ -138,12 +143,12 @@ def annotate_session(session: ForensicsSession) -> AnnotatedSession:
                 risk_score=0,
                 binary=None
             )
-            
+
         annotated_events.append(AnnotatedEvent(event=event, annotation=annotation))
         risk_progression.append(annotation.risk_score)
         if annotation.risk_score > max_risk:
             max_risk = annotation.risk_score
-            
+
     return AnnotatedSession(
         session=session,
         events=annotated_events,
