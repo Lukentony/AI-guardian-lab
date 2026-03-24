@@ -116,7 +116,7 @@
                     {{ key.replace('_', ' ').title() }}
                     <span class="flag-status">{% if flag.triggered %}TRIGGERED{% else %}CLEAR{% endif %}</span>
                 </h4>
-                <div style="font-size: 0.85em; color: #aaa;">Confidence: {{ (flag.confidence * 100)|round|int }}%</div>
+                <div style="font-size: 0.85em; color: #aaa;">Confidence: {{ flag.confidence }}</div>
                 <div class="flag-reason">{{ flag.reason }}</div>
             </div>
             {% endfor %}
