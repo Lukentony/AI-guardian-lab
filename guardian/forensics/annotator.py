@@ -61,28 +61,18 @@ def extract_binary(event: ForensicsEvent) -> str | None:
     if event.type != "tool_call":
         return None
 
-    # DEBUG
-    print(f"DEBUG: Extracting binary for event {event.seq}")
-    print(f"DEBUG: tool_name='{event.tool_name}', tool_input={event.tool_input}, content='{event.content[:50]}'")
-
-    # Priority 1: Check tool_input keys (OpenClaw style)
+    # Extract command from tool_input (standard mapping)
     if event.tool_input:
         for key in ["command", "cmd", "bash", "shell"]:
             cmd = event.tool_input.get(key)
             if cmd and isinstance(cmd, str):
                 parts = cmd.strip().split()
                 if parts:
-                    res = parts[0].split("/")[-1]
-                    print(f"DEBUG: Found binary in tool_input: {res}")
-                    return res
+                    return parts[0].split("/")[-1]
 
-    # Priority 2: Fallback to tool_name (OpenHands/SWE-agent style)
+    # Fallback to tool_name if command key is missing
     if event.tool_name:
-        res = event.tool_name.split("/")[-1]
-        print(f"DEBUG: Using tool_name as binary: {res}")
-        return res
-
-    print("DEBUG: No binary found!")
+        return event.tool_name.split("/")[-1]
     return None
 
 def classify_operation(binary: str | None) -> str:
