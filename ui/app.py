@@ -46,6 +46,7 @@ def forensics():
     error = None
     if request.method == 'POST':
         jsonl_content = request.form.get('jsonl_content', '').strip()
+        jsonl_content = jsonl_content.replace('\r\n', '\n').replace('\r', '\n')
         if not jsonl_content:
             error = "No JSONL content provided."
         else:
