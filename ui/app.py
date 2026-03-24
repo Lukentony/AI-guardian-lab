@@ -3,6 +3,7 @@ import requests
 import json
 import sqlite3
 import logging
+import re
 from flask import Flask, render_template, request
 from pathlib import Path
 
@@ -13,6 +14,37 @@ app.logger.setLevel(logging.DEBUG)
 DB_PATH = os.environ.get("DB_PATH", "/app/database/audit.db")
 GUARDIAN_API = os.environ.get("GUARDIAN_URL", "http://lab-guardian:5000")
 GUARDIAN_API_KEY = os.environ.get("GUARDIAN_API_KEY", "")
+
+def normalize_to_jsonl(raw_content):
+    """
+    Intelligently cleans and converts mangled input into valid JSONL.
+    Handles: glued objects }{, JSON arrays [{},{}], and trailing commas.
+    """
+    raw_content = raw_content.strip()
+    if not raw_content:
+        return ""
+
+    # 1. Fix glued objects: }{ or } { -> }\n{
+    normalized = re.sub(r'}\s*{', '}\n{', raw_content)
+
+    # 2. Check if it's a JSON array [...]
+    if normalized.startswith('[') and normalized.endswith(']'):
+        try:
+            parsed = json.loads(normalized)
+            if isinstance(parsed, list):
+                # Convert list of dicts to JSONL string
+                return "\n".join(json.dumps(item) for item in parsed)
+        except:
+            pass # Not a standard array, continue with line-by-line cleanup
+
+    # 3. Clean up line by line: remove trailing commas and extra whitespace
+    lines = []
+    for line in normalized.split('\n'):
+        line = line.strip().rstrip(',')
+        if line:
+            lines.append(line)
+
+    return "\n".join(lines)
 
 def get_stats():
     conn = sqlite3.connect(DB_PATH)
@@ -49,8 +81,11 @@ def forensics():
     report = None
     error = None
     if request.method == 'POST':
-        jsonl_content = request.form.get('jsonl_content', '').strip()
-        jsonl_content = jsonl_content.replace('\r\n', '\n').replace('\r', '\n')
+        raw_content = request.form.get('jsonl_content', '').strip()
+        
+        # Apply intelligent normalization
+        jsonl_content = normalize_to_jsonl(raw_content)
+        
         if not jsonl_content:
             error = "No JSONL content provided."
         else:
@@ -62,10 +97,7 @@ def forensics():
                     timeout=60
                 )
                 
-                # Debug logging
                 app.logger.debug(f"Guardian response status: {resp.status_code}")
-                app.logger.debug(f"Guardian response body: {resp.text[:500]}")
-
                 if resp.status_code == 200:
                     try:
                         report = resp.json()
