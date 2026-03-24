@@ -30,6 +30,9 @@
         .score-yellow { color: #ffd700; }
         .score-green { color: #16c79a; }
 
+        .summary-box { background: #16213e; padding: 20px; border-radius: 12px; border: 1px solid #0f3460; margin-bottom: 30px; color: #ccc; line-height: 1.6; }
+        .summary-box strong { color: #16c79a; }
+
         .flags { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
         .flag-card { background: #16213e; padding: 20px; border-radius: 12px; border-left: 5px solid #0f3460; }
         .flag-card.triggered { border-left-color: #ff6b6b; }
@@ -82,23 +85,27 @@
         <div class="stats">
             <div class="stat-card">
                 <h3>Anomaly Score</h3>
-                {% set score = report.summary.anomaly_score %}
+                {% set score = report.anomaly_score %}
                 <div class="val {% if score > 50 %}score-red{% elif score > 20 %}score-yellow{% else %}score-green{% endif %}">
                     {{ score }}
                 </div>
             </div>
             <div class="stat-card">
                 <h3>Session ID</h3>
-                <div class="val" style="font-size: 1.2em; margin-top: 15px; color: #16c79a;">{{ report.summary.session_id[:12] }}...</div>
+                <div class="val" style="font-size: 1.2em; margin-top: 15px; color: #16c79a;">{{ report.session_id[:12] }}...</div>
             </div>
             <div class="stat-card">
                 <h3>Events</h3>
-                <div class="val" style="color: #4ecdc4;">{{ report.summary.event_count }}</div>
+                <div class="val" style="color: #4ecdc4;">{{ report.event_count }}</div>
             </div>
             <div class="stat-card">
                 <h3>Tool Calls</h3>
-                <div class="val" style="color: #4ecdc4;">{{ report.summary.tool_call_count }}</div>
+                <div class="val" style="color: #4ecdc4;">{{ report.tool_call_count }}</div>
             </div>
+        </div>
+
+        <div class="summary-box">
+            <strong>Narrative Summary:</strong> {{ report.summary }}
         </div>
 
         <!-- Section B: Flags -->
@@ -132,16 +139,16 @@
                 {% for event in report.timeline %}
                 <tr>
                     <td>{{ event.seq }}</td>
-                    <td class="tool">{{ event.tool }}</td>
+                    <td class="tool">{{ event.tool_name }}</td>
                     <td>{{ event.binary or '-' }}</td>
                     <td>
-                        <span class="zone zone-{{ event.zone }}">
-                            {{ event.zone.upper() }}
+                        <span class="zone zone-{{ event.policy_zone }}">
+                            {{ event.policy_zone.upper() }}
                         </span>
                     </td>
                     <td class="risk {% if event.risk_score > 7 %}risk-high{% endif %}">{{ event.risk_score }}</td>
                     <td style="color: #aaa; font-style: italic;">
-                        {{ event.input_preview[:100] }}{% if event.input_preview|length > 100 %}...{% endif %}
+                        {{ event.truncated_input }}
                     </td>
                 </tr>
                 {% endfor %}
