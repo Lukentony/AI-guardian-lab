@@ -2,10 +2,14 @@ import os
 import requests
 import json
 import sqlite3
+import logging
 from flask import Flask, render_template, request
 from pathlib import Path
 
 app = Flask(__name__)
+# Enable debug logging
+app.logger.setLevel(logging.DEBUG)
+
 DB_PATH = os.environ.get("DB_PATH", "/app/database/audit.db")
 GUARDIAN_API = os.environ.get("GUARDIAN_URL", "http://lab-guardian:5000")
 GUARDIAN_API_KEY = os.environ.get("GUARDIAN_API_KEY", "")
@@ -57,13 +61,21 @@ def forensics():
                     headers={"X-API-Key": GUARDIAN_API_KEY},
                     timeout=60
                 )
+                
+                # Debug logging
+                app.logger.debug(f"Guardian response status: {resp.status_code}")
+                app.logger.debug(f"Guardian response body: {resp.text[:500]}")
+
                 if resp.status_code == 200:
-                    report = resp.json()
+                    try:
+                        report = resp.json()
+                    except Exception as e:
+                        error = f"JSON parse error: {e} — raw: {resp.text[:200]}"
                 else:
                     try:
                         error = resp.json().get("error", "Unknown error from Guardian API")
                     except:
-                        error = f"Guardian API returned status {resp.status_code}: {resp.text}"
+                        error = f"Guardian API returned status {resp.status_code}: {resp.text[:200]}"
             except Exception as e:
                 error = f"Could not reach Guardian API: {e}"
     return render_template('forensics.html', report=report, error=error)
