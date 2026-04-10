@@ -50,3 +50,11 @@ pytest_report*.txt
 debug_*.py
 pytest_*.txt
 *.bak
+
+# Database backups
+database/*.db.*_backup
+
+# Local analysis and scratch files
+analisi.txt
+run_tests.py
+run_comprehensive_tests.py
