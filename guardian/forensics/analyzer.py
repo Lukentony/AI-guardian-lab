@@ -1,8 +1,9 @@
 import json
+import os
 import urllib.request
 import urllib.error
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from forensics.parser import ForensicsEvent, ForensicsSession
 from forensics.annotator import AnnotatedEvent, AnnotatedSession
 
@@ -23,7 +24,9 @@ class BehaviorReport:
 
 @dataclass
 class AnalyzerConfig:
-    llm_base_url: str = "http://100.64.0.2:11434"
+    llm_base_url: str = field(
+        default_factory=lambda: os.environ.get("OLLAMA_URL", "http://host.docker.internal:11434")
+    )
     llm_model: str = "deepseek-coder-v2:16b"
     llm_timeout: int = 30
 
@@ -50,11 +53,15 @@ def _ollama_chat(config: AnalyzerConfig, system_prompt: str, user_prompt: str) -
         with urllib.request.urlopen(req, timeout=config.llm_timeout) as response:
             res_data = json.loads(response.read().decode("utf-8"))
             content = res_data.get("message", {}).get("content", "")
-            return json.loads(content)
+            try:
+                return json.loads(content)
+            except json.JSONDecodeError:
+                print(f"Ollama returned non-JSON content: {content[:200]}", file=sys.stderr)
+                return None
     except urllib.error.URLError as e:
         print(f"Ollama unreachable: {e}", file=sys.stderr)
         return None
-    except (json.JSONDecodeError, Exception) as e:
+    except Exception as e:
         print(f"Ollama response error: {e}", file=sys.stderr)
         return None
 
