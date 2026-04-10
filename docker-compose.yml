@@ -5,7 +5,7 @@ services:
       dockerfile: guardian/Dockerfile
     container_name: lab-guardian
     ports:
-      - "127.0.0.1:5000:5000"
+      - "${GUARDIAN_BIND_IP:-127.0.0.1}:5000:5000"
     networks:
       - agent-net
     environment:
