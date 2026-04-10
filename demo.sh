@@ -3,7 +3,7 @@
 # AI Guardian Lab — Demo Script
 # ============================================================================
 # Usage: ./demo.sh
-# Override host: GUARDIAN_URL=http://nuc2:5000 ./demo.sh
+# Override host: GUARDIAN_URL=http://srv1:5000 ./demo.sh
 # Requires: Docker running with Guardian stack up (docker-compose up -d)
 # ============================================================================
 
