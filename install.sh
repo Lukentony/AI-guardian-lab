@@ -349,7 +349,7 @@ cat > .env << EOF
 LLM_PROVIDER=$PRIMARY_PROVIDER
 
 # Ollama Configuration
-OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+OLLAMA_URL=${OLLAMA_HOST:-http://host.docker.internal:11434}
 OLLAMA_MODEL_CODER=${OLLAMA_MODEL_CODER:-qwen2.5-coder:7b}
 OLLAMA_MODEL_EXPLAIN=${OLLAMA_MODEL_EXPLAIN:-llama3.2:3b-instruct-q4_K_M}
 
