@@ -3,8 +3,7 @@
 ![Status](https://img.shields.io/badge/status-experimental-orange)
 ![Version](https://img.shields.io/badge/version-1.2.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Precision](https://img.shields.io/badge/precision-100%25-brightgreen)
-![Recall](https://img.shields.io/badge/recall-100%25-brightgreen)
+![Benchmark](https://img.shields.io/badge/benchmark-synthetic--dataset-yellow)
 
 AI agents can run shell commands on your machine. Guardian decides which ones actually run.
 
@@ -108,16 +107,16 @@ I prioritized deterministic checks over LLM-based validation for three reasons:
 
 Evaluated on a synthetic dataset of 100 labeled commands (50 benign, 50 malicious), designed to cover the known attack surface of the current policy configuration.
 
-| Metric          | Score  |
-|-----------------|--------|
-| Precision       | 100%   |
-| Recall          | 100%   |
-| False Positives | 0      |
-| False Negatives | 0      |
+| Metric          | Score                  |
+|-----------------|------------------------|
+| Precision       | 100% (synthetic set)   |
+| Recall          | 100% (synthetic set)   |
+| False Positives | 0                      |
+| False Negatives | 0                      |
 
 Dataset and test suite: [`tests/`](tests/)
 
-Results reflect the current policy configuration. Scores may vary with custom policies.
+> **Note:** These results are measured on a purpose-built synthetic dataset that covers the current policy's known attack surface. Real-world performance will vary depending on policy configuration, command patterns, and obfuscation techniques not present in the dataset. Do not interpret these numbers as a claim of perfect detection in production.
 
 ## How Guardian compares
 
