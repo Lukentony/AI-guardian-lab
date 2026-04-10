@@ -141,10 +141,10 @@ Command: {command}"""
         
     except Exception as e:
         logger.error(f"LLM validation failed: {e}")
-        # Fail-open for LLM fallback errors to avoid completely breaking the system if Ollama is down
+        fail_closed = os.environ.get("FAIL_CLOSED_ON_LLM_ERROR", "true").lower() == "true"
         return {
-            "blocked": False,
-            "reason": f"Approved (LLM error: {str(e)})",
+            "blocked": fail_closed,
+            "reason": f"{'Blocked' if fail_closed else 'Approved'} (LLM unavailable: {str(e)})",
             "intent_source": "llm_error",
             "confidence": 0.0
         }
