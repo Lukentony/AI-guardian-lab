@@ -5,13 +5,13 @@ services:
       dockerfile: guardian/Dockerfile
     container_name: lab-guardian
     ports:
-      - "100.64.0.3:5000:5000"
+      - "127.0.0.1:5000:5000"
     networks:
       - agent-net
     environment:
       - API_KEY=${API_KEY}
       - INTENT_LLM_MODEL=${INTENT_LLM_MODEL}
-      - OLLAMA_URL=${OLLAMA_URL}
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
     volumes:
       - ./guardian/config:/app/config:ro
       - ./guardian/learned:/app/learned:rw
@@ -23,7 +23,7 @@ services:
           cpus: '0.50'
           memory: 512M
     healthcheck:
-      test: [ "CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/health')" ]
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 300s
       timeout: 10s
       retries: 3
@@ -55,7 +55,7 @@ services:
           cpus: '0.75'
           memory: 1024M
     healthcheck:
-      test: [ "CMD", "python", "-c", "import requests; requests.get('http://localhost:5001/health')" ]
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
       interval: 300s
       timeout: 10s
       retries: 3
