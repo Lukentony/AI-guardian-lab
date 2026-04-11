@@ -262,18 +262,26 @@ fi
 
 ---
 
-## Ordine esecuzione consigliato (prossima sessione)
+## Stato (aggiornato 2026-04-11)
 
-| Step | Task | Tempo stimato |
-|------|------|---------------|
-| 1 | CRITICO-2: fail-closed intent.py | 15 min |
-| 2 | CRITICO-1: warning sandbox README + agent | 10 min |
-| 3 | CRITICO-3: OLLAMA_HOST → OLLAMA_URL nei docs | 5 min |
-| 4 | ALTO-1: rimuovere COPY tests/ da Dockerfile | 2 min |
-| 5 | MEDIO-1: fix default GUARDIAN_URL in ui/app.py | 2 min |
-| 6 | ALTO-3: RATE_LIMIT_STORAGE_URI configurabile | 10 min |
-| 7 | ALTO-2: GitHub Actions CI | 20 min |
-| 8 | MEDIO-2: install.sh NON_INTERACTIVE | 30 min |
+**TUTTI I FIX COMPLETATI** — 9 commit pushati localmente (vedi `git log --oneline`).
+Commit head: `76a78c1` — fix(guardian): improve secret masking regex
+
+Rimane solo il push ai remote (rete non raggiungibile al momento del commit):
+
+| Step | Task | Stato |
+|------|------|-------|
+| 1 | CRITICO-2: fail-closed intent.py | ✅ `40c6c36` |
+| 2 | CRITICO-1: warning sandbox README + agent | ✅ `0489f93` |
+| 3 | CRITICO-3: OLLAMA_HOST → OLLAMA_URL nei docs | ✅ `adfd95a` |
+| 4 | ALTO-1: rimuovere COPY tests/ da Dockerfile | ✅ `71906d3` |
+| 5 | MEDIO-1: fix default GUARDIAN_URL in ui/app.py | ✅ `9850ba2` |
+| 6 | ALTO-3: RATE_LIMIT_STORAGE_URI configurabile | ✅ `8d3c952` |
+| 7 | ALTO-2: GitHub Actions CI | ✅ `0aa94ab` |
+| 8 | MEDIO-2: install.sh NON_INTERACTIVE | ✅ `2f4d4ec` |
+| 9 | MINORE-1: mask_secrets regex migliorata | ✅ `76a78c1` |
+
+**Da fare: push (richiede rete)**
 
 ---
 
