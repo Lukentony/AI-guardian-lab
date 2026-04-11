@@ -93,7 +93,10 @@ def mask_secrets(text):
         (r'(?i)(sk-[A-Za-z0-9]{20,})', r'sk-***MASKED***'),
         (r'(?i)(gsk_[A-Za-z0-9]{20,})', r'gsk_***MASKED***'),
         (r'(?i)(AIza[0-9A-Za-z-_]{35})', r'AIza***MASKED***'), # Google API Key
-        (r'(?i)(Bearer\s+)[A-Za-z0-9\-\._~\+\/]+=*', r'\1***MASKED***')
+        (r'(?i)(Bearer\s+)[A-Za-z0-9\-\._~\+\/]+=*', r'\1***MASKED***'),
+        (r'ghp_[A-Za-z0-9]{36}', r'ghp_***MASKED***'),                    # GitHub classic PAT
+        (r'github_pat_[A-Za-z0-9_]{82}', r'github_pat_***MASKED***'),     # GitHub fine-grained PAT
+        (r'\b[0-9a-f]{40}\b', r'***MASKED_HEX40***'),                     # SHA1-length hex tokens (e.g. Gitea)
     ]
     for pattern, replacement in secret_patterns:
         text = re.sub(pattern, replacement, text)
