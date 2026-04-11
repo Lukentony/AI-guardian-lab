@@ -30,7 +30,7 @@ limiter = Limiter(
     get_remote_address,
     app=app,
     default_limits=["1000 per day"],
-    storage_uri="memory://",
+    storage_uri=os.environ.get("RATE_LIMIT_STORAGE_URI", "memory://"),
 )
 
 # Phase 5.5: Forensics API
