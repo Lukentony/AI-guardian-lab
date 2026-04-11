@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install guardian dependencies
+        run: pip install -r guardian/requirements.txt pytest
+
+      - name: Run test suite
+        run: pytest tests/ -v --tb=short
+
+      - name: Docker smoke test
+        run: |
+          cp .env.example .env
+          sed -i "s/API_KEY=CHANGE_ME/API_KEY=ci-test-key-123/" .env
+          echo "OLLAMA_URL=http://localhost:11434" >> .env
+          docker compose up -d --build guardian
+          echo "Waiting for guardian to start..."
+          sleep 20
+          curl -f -H "X-API-Key: ci-test-key-123" http://localhost:5000/health
+          docker compose down
