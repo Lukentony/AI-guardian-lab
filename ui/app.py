@@ -12,7 +12,7 @@ app = Flask(__name__)
 app.logger.setLevel(logging.DEBUG)
 
 DB_PATH = os.environ.get("DB_PATH", "/app/database/audit.db")
-GUARDIAN_API = os.environ.get("GUARDIAN_URL", "http://lab-guardian:5000")
+GUARDIAN_API = os.environ.get("GUARDIAN_URL", "http://guardian:5000")
 GUARDIAN_API_KEY = os.environ.get("GUARDIAN_API_KEY", "")
 
 # Demo sample sessions
