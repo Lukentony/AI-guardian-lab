@@ -12,7 +12,7 @@ Create a `.env` file in the root directory:
 ```env
 API_KEY=your_secure_random_key_here
 LLM_PROVIDER=ollama
-OLLAMA_HOST=http://host.docker.internal:11434
+OLLAMA_URL=http://host.docker.internal:11434
 OLLAMA_MODEL_CODER=qwen2.5-coder:7b
 OLLAMA_MODEL_EXPLAIN=llama3.2:3b-instruct
 ```

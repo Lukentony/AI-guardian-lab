@@ -114,7 +114,7 @@ For Ollama (local):
 
 text
 LLM_PROVIDER=ollama
-OLLAMA_HOST=http://localhost:11434
+OLLAMA_URL=http://localhost:11434
 OLLAMA_MODEL_CODER=qwen2.5-coder:7b
 OLLAMA_MODEL_EXPLAIN=llama3.2:3b-instruct-q4_K_M
 For Groq (cloud free):
@@ -213,7 +213,7 @@ bash
 OLLAMA_HOST=0.0.0.0:11434 ollama serve
 
 # In Guardian .env, set remote host
-OLLAMA_HOST=http://192.168.x.x:11434
+OLLAMA_URL=http://192.168.x.x:11434
 Post-Installation
 Validate Configuration
 bash
