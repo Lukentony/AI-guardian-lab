@@ -54,6 +54,9 @@ def clean_command(text):
     return text.strip()
 
 
+# SECURITY NOTICE: This function executes LLM-generated commands directly in the
+# container via /bin/bash -c. Intended for DEMO/RESEARCH only. In production, replace
+# with a proper sandbox (gVisor, Firejail, nsjail, or ephemeral VM per execution).
 def run_command(command):
     """Executes a bash command safely with a timeout."""
     try:
