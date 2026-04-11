@@ -14,7 +14,6 @@ COPY guardian/forensics/ forensics/
 COPY guardian/schema.sql .
 COPY guardian/entrypoint.sh .
 COPY guardian/config/ config/
-COPY tests/ tests/
 RUN chmod +x /app/entrypoint.sh && \
     chown -R guardian:guardian /app
 USER guardian
