@@ -5,6 +5,11 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Benchmark](https://img.shields.io/badge/benchmark-synthetic--dataset-yellow)
 
+> **Warning — Demo/Research Only:** The agent executes LLM-generated shell commands directly
+> inside a Docker container via `/bin/bash -c`. No additional sandboxing is in place.
+> Do NOT use in production without a proper sandbox layer (gVisor, Firejail, nsjail,
+> or ephemeral VM per command).
+
 AI agents can run shell commands on your machine. Guardian decides which ones actually run.
 
 AI agent frameworks often provide LLMs with direct shell access to complete tasks. In most implementations, security relies entirely on the model's willingness to follow system instructions. But model compliance is not the same thing as security enforcement.
