@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+# Non-interactive mode: set NON_INTERACTIVE=true to skip all prompts and use
+# environment variables or defaults for all settings. Useful for CI pipelines.
+NON_INTERACTIVE=${NON_INTERACTIVE:-false}
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -96,9 +100,13 @@ if check_command ollama; then
 fi
 
 if [ "$OLLAMA_DETECTED" = false ]; then
-    read -p "Do you have Ollama running on a remote server? (y/n): " has_remote
+    if [ "$NON_INTERACTIVE" != "true" ]; then
+        read -p "Do you have Ollama running on a remote server? (y/n): " has_remote
+    fi
     if [ "$has_remote" = "y" ]; then
-        read -p "Enter Ollama host (e.g., http://192.168.x.x:11434): " remote_host
+        if [ "$NON_INTERACTIVE" != "true" ]; then
+            read -p "Enter Ollama host (e.g., http://192.168.x.x:11434): " remote_host
+        fi
         if test_ollama_connection "$remote_host"; then
             log_success "Connected to Ollama at $remote_host"
             OLLAMA_DETECTED=true
@@ -132,7 +140,9 @@ PRIMARY_PROVIDER=""
 FALLBACK_PROVIDERS=()
 
 if [ "$OLLAMA_DETECTED" = true ]; then
-    read -p "Use Ollama as primary provider? (y/n) [y]: " use_ollama
+    if [ "$NON_INTERACTIVE" != "true" ]; then
+        read -p "Use Ollama as primary provider? (y/n) [y]: " use_ollama
+    fi
     use_ollama="${use_ollama:-y}"
     
     if [ "$use_ollama" = "y" ]; then
@@ -172,11 +182,15 @@ if [ "$OLLAMA_DETECTED" = true ]; then
             
             # Select Coder Model
             while true; do
-                read -p "Select CODER model number [1]: " coder_choice
+                if [ "$NON_INTERACTIVE" != "true" ]; then
+                    read -p "Select CODER model number [1]: " coder_choice
+                fi
                 coder_choice="${coder_choice:-1}"
-                
+
                 if [ "$coder_choice" -eq 0 ]; then
-                    read -p "Enter manual model name: " OLLAMA_MODEL_CODER
+                    if [ "$NON_INTERACTIVE" != "true" ]; then
+                        read -p "Enter manual model name: " OLLAMA_MODEL_CODER
+                    fi
                     break
                 elif [ "$coder_choice" -ge 1 ] && [ "$coder_choice" -le "${#ALL_MODELS[@]}" ]; then
                     OLLAMA_MODEL_CODER="${ALL_MODELS[$((coder_choice-1))]}"
@@ -185,17 +199,21 @@ if [ "$OLLAMA_DETECTED" = true ]; then
                     echo -e "${RED}Invalid selection.${NC}"
                 fi
             done
-            
+
             # Select Explain Model (Optional: reuse logic or just ask)
             echo ""
             while true; do
-                read -p "Select EXPLAIN model number [same as CODER]: " explain_choice
-                
+                if [ "$NON_INTERACTIVE" != "true" ]; then
+                    read -p "Select EXPLAIN model number [same as CODER]: " explain_choice
+                fi
+
                 if [ -z "$explain_choice" ]; then
                     OLLAMA_MODEL_EXPLAIN="$OLLAMA_MODEL_CODER"
                     break
                 elif [ "$explain_choice" -eq 0 ]; then
-                    read -p "Enter manual model name: " OLLAMA_MODEL_EXPLAIN
+                    if [ "$NON_INTERACTIVE" != "true" ]; then
+                        read -p "Enter manual model name: " OLLAMA_MODEL_EXPLAIN
+                    fi
                      break
                 elif [ "$explain_choice" -ge 1 ] && [ "$explain_choice" -le "${#ALL_MODELS[@]}" ]; then
                      OLLAMA_MODEL_EXPLAIN="${ALL_MODELS[$((explain_choice-1))]}"
@@ -209,21 +227,24 @@ if [ "$OLLAMA_DETECTED" = true ]; then
             
         else
             log_warn "Could not list models automatically."
-            read -p "Coder model [qwen2.5-coder:7b]: " coder_model
+            if [ "$NON_INTERACTIVE" != "true" ]; then
+                read -p "Coder model [qwen2.5-coder:7b]: " coder_model
+                read -p "Explain model [llama3.2:3b-instruct-q4_K_M]: " explain_model
+            fi
             OLLAMA_MODEL_CODER="${coder_model:-qwen2.5-coder:7b}"
-            
-            read -p "Explain model [llama3.2:3b-instruct-q4_K_M]: " explain_model
             OLLAMA_MODEL_EXPLAIN="${explain_model:-llama3.2:3b-instruct-q4_K_M}"
         fi
-        
+
         # Only pull if not present (simple check: if we selected from list, it's present. If manual, maybe not)
         # But safest is to try pull anyway to update or ensure it exists
         if [[ ! " ${ALL_MODELS[*]} " =~ " ${OLLAMA_MODEL_CODER} " ]]; then
              log_info "Pulling model $OLLAMA_MODEL_CODER..."
              ollama pull "$OLLAMA_MODEL_CODER" 2>/dev/null || log_warn "Failed to pull/verify $OLLAMA_MODEL_CODER"
         fi
-        
-        read -p "Configure cloud fallback provider? (y/n) [n]: " add_fallback
+
+        if [ "$NON_INTERACTIVE" != "true" ]; then
+            read -p "Configure cloud fallback provider? (y/n) [n]: " add_fallback
+        fi
     fi
 else
     log_warn "Ollama not detected. You must configure a cloud provider."
@@ -240,11 +261,16 @@ if [ "$add_fallback" = "y" ] || [ -z "$PRIMARY_PROVIDER" ]; then
     echo "  5) Google Gemini"
     echo "  6) Skip (manual config later)"
     echo ""
-    read -p "Enter choice [1-6]: " cloud_choice
-    
+    if [ "$NON_INTERACTIVE" != "true" ]; then
+        read -p "Enter choice [1-6]: " cloud_choice
+    fi
+    cloud_choice="${cloud_choice:-6}"
+
     case $cloud_choice in
         1)
-            read -p "Enter Groq API key (from https://console.groq.com): " GROQ_API_KEY
+            if [ "$NON_INTERACTIVE" != "true" ]; then
+                read -p "Enter Groq API key (from https://console.groq.com): " GROQ_API_KEY
+            fi
             if [ -n "$GROQ_API_KEY" ]; then
                 log_info "Testing Groq connection..."
                 if test_api_key "groq" "$GROQ_API_KEY"; then
@@ -263,7 +289,9 @@ if [ "$add_fallback" = "y" ] || [ -z "$PRIMARY_PROVIDER" ]; then
             fi
             ;;
         2)
-            read -p "Enter OpenAI API key: " OPENAI_API_KEY
+            if [ "$NON_INTERACTIVE" != "true" ]; then
+                read -p "Enter OpenAI API key: " OPENAI_API_KEY
+            fi
             if [ -n "$OPENAI_API_KEY" ]; then
                 log_info "Testing OpenAI connection..."
                 if test_api_key "openai" "$OPENAI_API_KEY"; then
@@ -282,7 +310,9 @@ if [ "$add_fallback" = "y" ] || [ -z "$PRIMARY_PROVIDER" ]; then
             fi
             ;;
         3)
-            read -p "Enter Anthropic API key: " ANTHROPIC_API_KEY
+            if [ "$NON_INTERACTIVE" != "true" ]; then
+                read -p "Enter Anthropic API key: " ANTHROPIC_API_KEY
+            fi
             if [ -n "$ANTHROPIC_API_KEY" ]; then
                 log_info "Testing Anthropic connection..."
                 if test_api_key "anthropic" "$ANTHROPIC_API_KEY"; then
@@ -301,7 +331,9 @@ if [ "$add_fallback" = "y" ] || [ -z "$PRIMARY_PROVIDER" ]; then
             fi
             ;;
         4)
-            read -p "Enter DeepSeek API key: " DEEPSEEK_API_KEY
+            if [ "$NON_INTERACTIVE" != "true" ]; then
+                read -p "Enter DeepSeek API key: " DEEPSEEK_API_KEY
+            fi
             if [ -n "$DEEPSEEK_API_KEY" ]; then
                 log_info "DeepSeek key configured (no validation test available)"
                 [ -z "$PRIMARY_PROVIDER" ] && PRIMARY_PROVIDER="deepseek"
@@ -312,7 +344,9 @@ if [ "$add_fallback" = "y" ] || [ -z "$PRIMARY_PROVIDER" ]; then
             fi
             ;;
         5)
-            read -p "Enter Gemini API key: " GEMINI_API_KEY
+            if [ "$NON_INTERACTIVE" != "true" ]; then
+                read -p "Enter Gemini API key: " GEMINI_API_KEY
+            fi
             if [ -n "$GEMINI_API_KEY" ]; then
                 log_info "Gemini key configured (no validation test available)"
                 [ -z "$PRIMARY_PROVIDER" ] && PRIMARY_PROVIDER="gemini"
@@ -334,11 +368,13 @@ if [ -z "$PRIMARY_PROVIDER" ]; then
 fi
 
 log_info "Step 3/8: Port Configuration"
-read -p "Guardian API port [5000]: " guardian_port
+if [ "$NON_INTERACTIVE" != "true" ]; then
+    read -p "Guardian API port [5000]: " guardian_port
+    read -p "Agent API port [5001]: " agent_port
+    read -p "Web UI port [8080]: " ui_port
+fi
 GUARDIAN_PORT="${guardian_port:-5000}"
-read -p "Agent API port [5001]: " agent_port
 AGENT_PORT="${agent_port:-5001}"
-read -p "Web UI port [8080]: " ui_port
 UI_PORT="${ui_port:-8080}"
 
 log_info "Step 4/8: Generating .env configuration..."
