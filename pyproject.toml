@@ -1,0 +1,16 @@
+[tool.pytest.ini_options]
+# Senior touch: explicitly define python path and ignore folders that cause namespace collisions
+pythonpath = [
+  "guardian",
+  "guardian/guardian",
+  "."
+]
+testpaths = ["tests"]
+# Ignore the agent directory during collection to avoid 'main.py' name collision
+norecursedirs = ["agent", ".git", ".venv", "workspace"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning"
+]
