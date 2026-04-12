@@ -5,8 +5,9 @@ import os
 from pathlib import Path
 from unittest.mock import MagicMock
 
-# Python 3.14 workaround
-sys.modules['imghdr'] = MagicMock()
+# Python 3.13+ compatibility: imghdr was removed but some dependencies might still try to import it
+if sys.version_info >= (3, 13):
+    sys.modules['imghdr'] = MagicMock()
 os.environ['PATTERNS_PATH'] = os.path.abspath(os.path.join(os.path.dirname(__file__), '../guardian/config/patterns.yaml'))
 os.environ['POLICY_PATH'] = os.path.abspath(os.path.join(os.path.dirname(__file__), '../guardian/config/policy.yaml'))
 
