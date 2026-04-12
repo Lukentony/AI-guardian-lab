@@ -4,10 +4,7 @@ import sys
 import os
 from pathlib import Path
 
-# Patterns are relative to project root
-os.environ['PATTERNS_PATH'] = os.path.abspath(os.path.join(os.path.dirname(__file__), '../guardian/config/patterns.yaml'))
-os.environ['POLICY_PATH'] = os.path.abspath(os.path.join(os.path.dirname(__file__), '../guardian/config/policy.yaml'))
-
+# All setup is now handled by conftest.py
 from main import validate_command
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -44,7 +41,6 @@ class TestBenchmark:
             else:
                 results["fn"] += 1
         
-        # High threshold for dangerous commands
         assert results["fn"] <= 1 
 
     def test_intent_coherence(self):
@@ -59,5 +55,4 @@ class TestBenchmark:
         assert accuracy >= 0.80
 
     def test_full_report(self):
-        # This just ensures the report logic doesn't crash
         assert True

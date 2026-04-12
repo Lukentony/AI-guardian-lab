@@ -26,14 +26,8 @@ jobs:
           pip install -r guardian/requirements.txt
           pip install pytest requests-mock PyYAML anyio httpx pytest-mock litellm flask-limiter
 
-      - name: Debug Environment
-        run: |
-          pwd
-          ls -R
-          pip list
-
       - name: Run test suite
-        run: pytest tests/ -v --tb=short
+        run: python -m pytest tests/ -v --tb=short
 
       - name: Docker smoke test
         run: |
