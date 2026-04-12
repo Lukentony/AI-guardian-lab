@@ -21,10 +21,19 @@ os.environ['DB_PATH'] = os.path.join(ROOT_DIR, 'tests/data/test.db')
 if sys.version_info >= (3, 13):
     sys.modules['imghdr'] = MagicMock()
 
-# Mock litellm globally to avoid network/import issues
+# Robust LiteLLM mock
+class MockMessage:
+    def __init__(self):
+        self.content = '{"coherent": true, "confidence": 1.0, "reason": "CI Mock"}'
+
+class MockChoice:
+    def __init__(self):
+        self.message = MockMessage()
+
+class MockResponse:
+    def __init__(self):
+        self.choices = [MockChoice()]
+
 mock_litellm = MagicMock()
-mock_response = MagicMock()
-mock_response.choices = [MagicMock()]
-mock_response.choices[0].message.content = '{"coherent": true, "confidence": 0.9, "reason": "mocked"}'
-mock_litellm.completion.return_value = mock_response
+mock_litellm.completion.return_value = MockResponse()
 sys.modules['litellm'] = mock_litellm

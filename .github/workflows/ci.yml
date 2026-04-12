@@ -23,7 +23,9 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
+          # Install both Guardian and Agent dependencies to prevent ImportErrors during collection
           pip install -r guardian/requirements.txt
+          pip install -r agent/requirements.txt
           pip install pytest requests-mock PyYAML anyio httpx pytest-mock litellm flask-limiter
 
       - name: Run test suite
