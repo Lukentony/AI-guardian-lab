@@ -35,7 +35,10 @@ jobs:
         run: |
           cp .env.example .env
           sed -i "s/API_KEY=CHANGE_ME/API_KEY=ci-test-key-123/" .env
-          # Senior touch: Bind to 0.0.0.0 in CI to ensure host reachability
+          # Senior touch: Fix permissions for Docker volumes in CI
+          mkdir -p database guardian/learned
+          chmod -R 777 database guardian/learned
+          
           export GUARDIAN_BIND_IP=0.0.0.0
           docker compose up -d --build guardian
           echo "Waiting for guardian to reach healthy state..."
