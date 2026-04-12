@@ -24,20 +24,21 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r guardian/requirements.txt
-          # Essential test and runtime dependencies
-          pip install pytest requests-mock PyYAML anyio httpx pytest-mock
+          pip install pytest requests-mock PyYAML anyio httpx pytest-mock litellm flask-limiter
+
+      - name: Debug Environment
+        run: |
+          pwd
+          ls -R
+          pip list
 
       - name: Run test suite
-        env:
-          # Senior touch: ensure all module paths are visible to the test runner
-          PYTHONPATH: ./:./guardian:./guardian/guardian:./agent
-        run: pytest tests/ -v --tb=native
+        run: pytest tests/ -v --tb=short
 
       - name: Docker smoke test
         run: |
           cp .env.example .env
           sed -i "s/API_KEY=CHANGE_ME/API_KEY=ci-test-key-123/" .env
-          # Ensure docker-compose uses the ci key
           docker compose up -d --build guardian
           echo "Waiting for guardian to start..."
           sleep 20
