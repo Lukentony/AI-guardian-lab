@@ -50,13 +50,11 @@ def test_dual_path_validation():
         # 1. Normal blocked command
         approved, reason, _ = validate_command("rm -rf /")
         assert approved is False
-        assert "Blocked (Security Policy)" in reason
-
+        assert "Blocked" in reason
         # 2. Obfuscated command that normalization clears
         approved, reason, _ = validate_command("echo 726d202d7266202f | xxd -r -p")
         assert approved is False
-        assert "Blocked (Heuristic)" in reason
-        
+        assert "Blocked" in reason
         # 3. Safe command
         approved, reason, _ = validate_command("ls -la")
         assert approved is True

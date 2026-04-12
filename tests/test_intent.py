@@ -68,8 +68,8 @@ def test_check_intent_llm(mock_completion):
     assert not res3["blocked"]
     assert res3["intent_source"] == "llm"
     
-    # Error fallback
+    # Error fallback (Senior Level: Fail-Closed)
     mock_completion.side_effect = Exception("API error")
     res4 = check_intent_llm("date", "test")
-    assert not res4["blocked"]
+    assert res4["blocked"] # Changed from False to True for Fail-Closed security
     assert res4["intent_source"] == "llm_error"
