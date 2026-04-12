@@ -85,7 +85,7 @@ def run_command(command):
 def health():
     return jsonify({"status": "healthy"}), 200
 
-SANDBOX_MODE = os.getenv("SANDBOX_MODE", "false").lower() == "true"
+SANDBOX_MODE = os.getenv("EXECUTE_COMMANDS", "false").lower() == "true"
 
 @app.route('/execute', methods=['POST'])
 @limiter.limit("60 per minute")
@@ -142,17 +142,18 @@ def execute():
         if val_data.get('approved'):
             if not SANDBOX_MODE:
                 # Senior-level feature: Safe dry-run by default
+                # EXECUTE_COMMANDS must be 'true' for real execution
                 return jsonify({
                     "status": "simulated",
                     "command": command,
-                    "output": f"[SIMULATED] Command '{command}' would be executed here.",
+                    "output": f"[DRY-RUN] Command '{command}' would be executed. Enable EXECUTE_COMMANDS=true for real action.",
                     "stderr": "",
                     "exit_code": 0,
-                    "note": "SANDBOX_MODE is disabled (default). No real execution occurred.",
+                    "note": "EXECUTE_COMMANDS is false (default). No real execution occurred.",
                     "llm_provider": LLM_PROVIDER
                 }), 200
 
-            # PHASE 1: Real command execution (only if SANDBOX_MODE=true)
+            # PHASE 1: Real command execution (only if EXECUTE_COMMANDS=true)
             exec_result = run_command(command)
             
             return jsonify({
