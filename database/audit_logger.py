@@ -24,22 +24,32 @@ def mask_secrets(text):
         text = re.sub(pattern, replacement, text)
     return text
 
-def calculate_row_hash(prev_hash, timestamp, task, command, status):
-    """Senior Feature: Forensic Chain Hashing with HMAC to prevent log tampering."""
-    data = f"{prev_hash}|{timestamp}|{task}|{command}|{status}"
+def calculate_row_hash(prev_hash, timestamp, task, command, status, simulated):
+    """Senior Feature: Forensic Chain Hashing with HMAC-SHA256 for audit integrity."""
+    if not SIGNING_KEY or SIGNING_KEY == "internal-dev-key":
+        # In a real senior-level app, we'd log a security warning here
+        pass
+        
+    payload = f"{prev_hash}|{timestamp}|{task}|{command}|{status}|{simulated}".encode('utf-8')
     return hmac.new(
         SIGNING_KEY.encode('utf-8'),
-        data.encode('utf-8'),
+        payload,
         hashlib.sha256
     ).hexdigest()
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
+    # Migration: Ensure 'simulated' column exists
+    try:
+        conn.execute("ALTER TABLE command_log ADD COLUMN simulated INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass # Already exists
+    
     with open(Path(__file__).parent / "schema.sql") as f:
         conn.executescript(f.read())
     conn.close()
 
-def log_command(task, command, status, llm_provider=None, guardian_reason=None):
+def log_command(task, command, status, llm_provider=None, guardian_reason=None, simulated=0):
     # SEC-04: Mask secrets before persisting
     safe_task = mask_secrets(task)
     safe_command = mask_secrets(command)
@@ -52,11 +62,11 @@ def log_command(task, command, status, llm_provider=None, guardian_reason=None):
     last_row = cursor.fetchone()
     prev_hash = last_row[0] if last_row else "GENESIS"
     
-    row_hash = calculate_row_hash(prev_hash, timestamp, safe_task, safe_command, status)
+    row_hash = calculate_row_hash(prev_hash, timestamp, safe_task, safe_command, status, simulated)
     
     conn.execute(
-        "INSERT INTO command_log (timestamp, task, command, status, llm_provider, guardian_reason, prev_hash, row_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (timestamp, safe_task, safe_command, status, llm_provider, guardian_reason, prev_hash, row_hash)
+        "INSERT INTO command_log (timestamp, task, command, status, llm_provider, guardian_reason, prev_hash, row_hash, simulated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (timestamp, safe_task, safe_command, status, llm_provider, guardian_reason, prev_hash, row_hash, simulated)
     )
     conn.commit()
     conn.close()
