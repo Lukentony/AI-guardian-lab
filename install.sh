@@ -425,6 +425,7 @@ PATTERN_LEARNING_SAMPLE_SIZE=100
 EOF
 
 log_success ".env file created"
+chmod 600 .env || log_warn "Could not set strict permissions on .env (platform limit)"
 
 log_info "Step 5/8: Initializing directories..."
 mkdir -p database workspace guardian/config

@@ -1,10 +1,14 @@
 import sqlite3
 import re
 import hashlib
+import hmac
+import os
 from datetime import datetime
 from pathlib import Path
 
 DB_PATH = Path(__file__).parent / "audit.db"
+# Senior-level feature: Cryptographic signing of logs
+SIGNING_KEY = os.environ.get("LOG_HMAC_KEY") or os.environ.get("API_KEY") or "internal-dev-key"
 
 # SEC-04: Mask secrets before writing to the database
 def mask_secrets(text):
@@ -21,9 +25,13 @@ def mask_secrets(text):
     return text
 
 def calculate_row_hash(prev_hash, timestamp, task, command, status):
-    """Senior Feature: Forensic Chain Hashing to prevent log tampering."""
+    """Senior Feature: Forensic Chain Hashing with HMAC to prevent log tampering."""
     data = f"{prev_hash}|{timestamp}|{task}|{command}|{status}"
-    return hashlib.sha256(data.encode()).hexdigest()
+    return hmac.new(
+        SIGNING_KEY.encode('utf-8'),
+        data.encode('utf-8'),
+        hashlib.sha256
+    ).hexdigest()
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
