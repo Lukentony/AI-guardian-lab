@@ -7,7 +7,6 @@ on:
     branches: [main]
 
 env:
-  # Senior touch: silence node.js 20 deprecation warnings and future-proof the runner
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
@@ -23,19 +22,22 @@ jobs:
 
       - name: Install dependencies
         run: |
+          pip install --upgrade pip
           pip install -r guardian/requirements.txt
-          pip install pytest requests-mock PyYAML
+          # Essential test and runtime dependencies
+          pip install pytest requests-mock PyYAML anyio httpx pytest-mock
 
       - name: Run test suite
         env:
-          PYTHONPATH: .
-        run: pytest tests/ -v --tb=short
+          # Senior touch: ensure all module paths are visible to the test runner
+          PYTHONPATH: ./:./guardian:./guardian/guardian:./agent
+        run: pytest tests/ -v --tb=native
 
       - name: Docker smoke test
         run: |
           cp .env.example .env
           sed -i "s/API_KEY=CHANGE_ME/API_KEY=ci-test-key-123/" .env
-          echo "OLLAMA_URL=http://localhost:11434" >> .env
+          # Ensure docker-compose uses the ci key
           docker compose up -d --build guardian
           echo "Waiting for guardian to start..."
           sleep 20
