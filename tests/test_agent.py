@@ -3,10 +3,7 @@ import os
 import pytest
 from unittest.mock import MagicMock
 
-# Python 3.14 workaround: imghdr was removed but litellm (dependency of main) imports it
-sys.modules['imghdr'] = MagicMock()
-# Mock litellm entirely to avoid complex dependency chain in tests
-sys.modules['litellm'] = MagicMock()
+# Mocks are now handled by conftest.py
 
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))

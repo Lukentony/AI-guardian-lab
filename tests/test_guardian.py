@@ -14,9 +14,7 @@ os.environ['DB_PATH'] = os.path.join(PROJECT_ROOT, 'tests/data/test.db')
 os.environ['PATTERNS_PATH'] = os.path.join(PROJECT_ROOT, 'tests/data/patterns.yaml')
 os.environ['POLICY_PATH'] = os.path.join(PROJECT_ROOT, 'tests/data/policy.yaml')
 
-# Mocking modules that fail on module load due to Python 3.14 or missing env
-sys.modules['imghdr'] = MagicMock()
-sys.modules['litellm'] = MagicMock()
+# Mocks are now handled by conftest.py
 
 # Import the functions directly
 # Now that we have dummy files, the import should succeed without mocking 'open'

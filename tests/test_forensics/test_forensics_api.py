@@ -23,9 +23,7 @@ os.environ['DB_PATH'] = ":memory:"
 os.environ['TESTING'] = "true"
 os.environ['API_KEY'] = "test-key"
 
-# 3. Mock litellm because it's incompatible with Python 3.14 (imghdr removal)
-mock_litellm = MagicMock()
-sys.modules['litellm'] = mock_litellm
+# Mocks are now handled by conftest.py
 
 # Now app should be importable successfully
 from guardian.guardian.main import app
