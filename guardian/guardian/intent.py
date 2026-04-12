@@ -95,6 +95,30 @@ def check_intent_mapping(command: str, task: str) -> dict:
     # If not blocked, but both classified
     return {"blocked": False, "reason": "Approved by Intent Mapping", "intent_source": "mapping", "needs_llm": False}
 
+def extract_json(text: str) -> dict:
+    """Robust JSON extraction from LLM response strings."""
+    try:
+        # 1. Try direct parse
+        return json.loads(text)
+    except json.JSONDecodeError:
+        # 2. Try to find JSON block in markdown
+        match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(1))
+            except json.JSONDecodeError:
+                pass
+        
+        # 3. Last resort: find first { and last }
+        match = re.search(r"(\{.*\})", text, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(1))
+            except json.JSONDecodeError:
+                pass
+                
+    raise ValueError(f"Could not extract valid JSON from LLM response: {text[:100]}...")
+
 def check_intent_llm(command: str, task: str) -> dict:
     """
     Validates coherence using LLM for ambiguous cases.
@@ -113,14 +137,15 @@ Command: {command}"""
             model=model,
             messages=[{"role": "user", "content": prompt}],
             api_base=api_base,
-            response_format={"type": "json_object"},
+            # Force JSON if supported by provider
+            response_format={"type": "json_object"} if "ollama" in model or "gpt" in model else None,
             temperature=0.0
         )
         
         content = response.choices[0].message.content
-        result = json.loads(content)
+        result = extract_json(content)
         
-        coherent = result.get('coherent', True)  # default to true if missing
+        coherent = result.get('coherent', True)
         confidence = float(result.get('confidence', 0.0))
         reason = result.get('reason', 'LLM analysis complete')
         
