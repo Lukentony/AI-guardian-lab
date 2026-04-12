@@ -81,6 +81,10 @@ services:
       - DB_PATH=/app/database/audit.db
     volumes:
       - ./database:/app/database:rw
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     restart: unless-stopped
     deploy:
       resources:
