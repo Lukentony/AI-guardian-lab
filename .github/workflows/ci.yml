@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  # Senior touch: silence node.js 20 deprecation warnings and future-proof the runner
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -17,10 +21,14 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install guardian dependencies
-        run: pip install -r guardian/requirements.txt pytest
+      - name: Install dependencies
+        run: |
+          pip install -r guardian/requirements.txt
+          pip install pytest requests-mock PyYAML
 
       - name: Run test suite
+        env:
+          PYTHONPATH: .
         run: pytest tests/ -v --tb=short
 
       - name: Docker smoke test
