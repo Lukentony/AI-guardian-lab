@@ -35,8 +35,19 @@ jobs:
         run: |
           cp .env.example .env
           sed -i "s/API_KEY=CHANGE_ME/API_KEY=ci-test-key-123/" .env
+          # Senior touch: Bind to 0.0.0.0 in CI to ensure host reachability
+          export GUARDIAN_BIND_IP=0.0.0.0
           docker compose up -d --build guardian
-          echo "Waiting for guardian to start..."
-          sleep 20
-          curl -f -H "X-API-Key: ci-test-key-123" http://localhost:5000/health
-          docker compose down
+          echo "Waiting for guardian to reach healthy state..."
+          # Better than sleep: retry curl for 30 seconds
+          for i in {1..15}; do
+            if curl -s -f -H "X-API-Key: ci-test-key-123" http://localhost:5000/health; then
+              echo "Guardian is UP!"
+              exit 0
+            fi
+            echo "Waiting... ($i)"
+            sleep 2
+          done
+          echo "ERROR: Guardian failed to start or is unreachable"
+          docker logs lab-guardian
+          exit 1
