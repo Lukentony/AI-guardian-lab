@@ -3,9 +3,9 @@
 
 set -e
 
-ENDPOINT="http://100.64.0.3:5000/forensics/analyze"
-DEFAULT_API_KEY="66597f7219053532cc2843bf6be3faa19b19e07579c455fab233473775cedabb"
-API_KEY="${GUARDIAN_API_KEY:-$DEFAULT_API_KEY}"
+ENDPOINT="${GUARDIAN_ENDPOINT:-http://localhost:5000/forensics/analyze}"
+# DEFAULT_API_KEY removed — was hardcoded here (security risk)
+API_KEY="${GUARDIAN_API_KEY:?Set GUARDIAN_API_KEY before running this script}"
 TMP_PAYLOAD="/tmp/guardian_forensics_payload.json"
 
 for cmd in curl python3; do

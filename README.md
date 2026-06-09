@@ -152,7 +152,7 @@ It works with any agent framework that produces structured logs — not just Gua
 
 **Try it:**
 ```bash
-bash demo_forensics.sh
+bash scripts/demo_forensics.sh
 ```
 
 **API:**
@@ -237,9 +237,9 @@ Guardian is a shield, not a miracle:
 3.  **Sandbox Dependency**: Guardian blocks commands, but final security also depends on the environment isolation (sandbox/docker) where the agent runs.
 
 ## Documentation
-- [Architecture & Layers](ARCHITECTURE.md)
-- [Contributing](CONTRIBUTING.md)
-- [Security Policy](SECURITY_POLICY.md)
+- [Architecture & Layers](docs/ARCHITECTURE.md)
+- [Contributing](docs/CONTRIBUTING.md)
+- [Security Policy](docs/SECURITY.md)
 
 ---
 

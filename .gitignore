@@ -7,6 +7,7 @@ __pycache__/
 venv/
 env/
 ENV/
+.venv/
 
 # Environment & Secrets
 .env
@@ -31,8 +32,10 @@ SESSION_STATE_*.md
 SESSION_LOG.md
 PROJECT_STATE.md
 SOCIAL_MEDIA_KIT.md
+learned/
 workspace/
-!workspace/.gitkeep
+!learned/
+workspace/.gitkeep
 
 # AI Agent Artifacts
 .gemini/
