@@ -29,7 +29,14 @@ jobs:
           pip install pytest requests-mock PyYAML anyio httpx pytest-mock litellm flask-limiter
 
       - name: Run test suite
-        run: python -m pytest tests/ -v --tb=short
+        run: python -m pytest tests/ -v --tb=short --junitxml=test-results.xml
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: test-results.xml
 
       - name: Docker smoke test
         run: |

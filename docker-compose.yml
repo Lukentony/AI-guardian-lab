@@ -25,7 +25,7 @@ services:
           memory: 512M
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 300s
+      interval: 30s
       timeout: 10s
       retries: 3
   agent:
@@ -61,7 +61,7 @@ services:
           memory: 1024M
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
-      interval: 300s
+      interval: 30s
       timeout: 10s
       retries: 3
     depends_on:
