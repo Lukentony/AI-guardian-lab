@@ -57,56 +57,44 @@ The AI ecosystem has an enforcement gap. While we have tools to monitor inputs a
 Guardian operates a 4-layer validation pipeline. It is "Fail-Closed" by design: if a layer has a doubt, the command is blocked.
 
 ```mermaid
-      A([🤖 Agent Request]) --> L1
+flowchart LR
+    A([🤖 Agent Request]) --> L1
 
-      subgraph L1 [L1 — Binary Allowlist]
-          B{Executable\nallowed?}
-      end
+    subgraph L1 [L1 — Binary Allowlist]
+        B{Executable\nallowed?}
+    end
 
-      subgraph L2 [L2 — Regex Engine]
-          C{Obfuscation /\ndangerous pattern?}
-      end
+    subgraph L2 [L2 — Regex Engine]
+        C{Obfuscation /\ndangerous pattern?}
+    end
 
-      subgraph L3 [L3 — Intent Coherence]
-          D{Command matches\nuser task intent?}
-      end
+    subgraph L3 [L3 — Intent Coherence]
+        D{Command matches\nuser task intent?}
+    end
 
-      subgraph L4 [L4 — LLM Semantic Check]
-          E{Ambiguous\ncases only}
-      end
+    subgraph L4 [L4 — LLM Semantic Check]
+        E{Ambiguous\ncases only}
+    end
 
-      L1 -->|pass| L2
-      L2 -->|pass| L3
-      L3 -->|pass| L4
-      L4 -->|pass| X([✅ EXECUTE])
+    L1 -->|pass| L2
+    L2 -->|pass| L3
+    L3 -->|pass| L4
+    L4 -->|pass| X([✅ EXECUTE])
 
-      B -->|block| R1([🚫 BLOCKED])
-      C -->|block| R2([🚫 BLOCKED])
-      D -->|block| R3([🚫 BLOCKED])
-      E -->|block| R4([🚫 BLOCKED])
+    B -->|block| R1([🚫 BLOCKED])
+    C -->|block| R2([🚫 BLOCKED])
+    D -->|block| R3([🚫 BLOCKED])
+    E -->|block| R4([🚫 BLOCKED])
 
-      style L1 fill:#1a1a2e,stroke:#4a90d9,color:#fff
-      end
-
-      L1 -->|pass| L2
-      L2 -->|pass| L3
-      L3 -->|pass| L4
-      L4 -->|pass| X([✅ EXECUTE])
-
-      B -->|block| R1([🚫 BLOCKED])
-      C -->|block| R2([🚫 BLOCKED])
-      D -->|block| R3([🚫 BLOCKED])
-      E -->|block| R4([🚫 BLOCKED])
-
-      style L1 fill:#1a1a2e,stroke:#4a90d9,color:#fff
-      style L2 fill:#1a1a2e,stroke:#e74c3c,color:#fff
-      style L3 fill:#1a1a2e,stroke:#f39c12,color:#fff
-      style L4 fill:#1a1a2e,stroke:#2ecc71,color:#fff
-      style X fill:#2ecc71,color:#000
-      style R1 fill:#e74c3c,color:#fff
-      style R2 fill:#e74c3c,color:#fff
-      style R3 fill:#e74c3c,color:#fff
-      style R4 fill:#e74c3c,color:#fff
+    style L1 fill:#1a1a2e,stroke:#4a90d9,color:#fff
+    style L2 fill:#1a1a2e,stroke:#e74c3c,color:#fff
+    style L3 fill:#1a1a2e,stroke:#f39c12,color:#fff
+    style L4 fill:#1a1a2e,stroke:#2ecc71,color:#fff
+    style X fill:#2ecc71,color:#000
+    style R1 fill:#e74c3c,color:#fff
+    style R2 fill:#e74c3c,color:#fff
+    style R3 fill:#e74c3c,color:#fff
+    style R4 fill:#e74c3c,color:#fff
 ```
 
 1.  **L1: Binary Allowlist**: Immediate filter based on risk zones (green, yellow, red). If a binary is not explicitly permitted in the current context, the execution dies here.
