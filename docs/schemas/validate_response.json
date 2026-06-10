@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "POST /validate response",
+  "type": "object",
+  "properties": {
+    "approved": { "type": "boolean" },
+    "reason": { "type": ["string", "null"] },
+    "intent_source": { "type": "string", "enum": ["regex", "allowlist", "mapping", "llm", "policy", "skip", "system_load"] }
+  },
+  "required": ["approved", "reason", "intent_source"]
+}
