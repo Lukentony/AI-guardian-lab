@@ -90,6 +90,8 @@ def test_secret_masking():
 
 def test_extract_binaries_redirection():
     from main import extract_binaries
+    assert extract_binaries("<<< 'hello' cat") == ["cat"]
+    assert extract_binaries("0<<EOF cat") == ["cat"]
     assert extract_binaries(">| /etc/passwd ls") == ["ls"]
     assert extract_binaries("ls>/dev/null") == ["ls"]
     assert extract_binaries("<< EOF cat") == ["cat"]
