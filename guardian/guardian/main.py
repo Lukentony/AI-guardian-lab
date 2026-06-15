@@ -274,16 +274,50 @@ def extract_binaries(command):
     except ValueError:
         tokens = command.split()
     
+    redirections = {'>|', '>>', '>&', '&>', '<&', '<', '>'}
+
     binaries = []
     take_next = True
     
-    for token in tokens:
+    i = 0
+    while i < len(tokens):
+        token = tokens[i]
+
         if token in separators:
             take_next = True
-        elif take_next:
+            i += 1
+            continue
+
+        # Check if the token is exactly a redirection operator
+        if token in redirections:
+            # Skip the operator and the following token (the file path)
+            i += 2
+            continue
+
+        # Check if token starts with a redirection (e.g. ">file.txt")
+        starts_with_redir = False
+        for redir in redirections:
+            if token.startswith(redir):
+                # Skip just this token
+                i += 1
+                starts_with_redir = True
+                break
+
+        if starts_with_redir:
+            continue
+
+        if take_next:
+            if '=' in token and not token.startswith('-'):
+                # it's an assignment (e.g., FOO=bar command), keep looking for the binary
+                i += 1
+                continue
+
             # Normalize path: ./rm -> rm
             binaries.append(os.path.basename(token))
             take_next = False
+
+        i += 1
+
     return binaries
 
 def validate_command(command, task=None):
