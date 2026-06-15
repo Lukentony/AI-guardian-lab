@@ -264,17 +264,22 @@ if os.path.exists(LEARNED_PATH):
 
 def extract_binaries(command):
     """BUG-04: Robustly extract all binaries from a command chain."""
-    # Pre-process message to ensure separators have spaces around them for shlex
-    separators = {';', '&&', '||', '|'}
-    for sep in separators:
-        command = command.replace(sep, f' {sep} ')
+    # Use regex to insert spaces around all control and redirection operators.
+    # This handles attached operators like ls>/dev/null and numeric descriptors like 2>
+    pattern = r'(\s*(;|&&|\|\||\||[0-9]*>>|[0-9]*>\||[0-9]*>&|[0-9]*<&|[0-9]*&>|<<|[0-9]*<|[0-9]*>)\s*)'
+
+    def replacer(match):
+        return f" {match.group(2)} "
+
+    spaced_command = re.sub(pattern, replacer, command)
     
     try:
-        tokens = shlex.split(command)
+        tokens = shlex.split(spaced_command)
     except ValueError:
-        tokens = command.split()
-    
-    redirections = {'>|', '>>', '>&', '&>', '<&', '<', '>'}
+        tokens = spaced_command.split()
+
+    separators = {';', '&&', '||', '|'}
+    redir_pattern = re.compile(r'^([0-9]*>>|[0-9]*>\||[0-9]*>&|[0-9]*<&|[0-9]*&>|<<|[0-9]*<|[0-9]*>)$')
 
     binaries = []
     take_next = True
@@ -288,22 +293,8 @@ def extract_binaries(command):
             i += 1
             continue
 
-        # Check if the token is exactly a redirection operator
-        if token in redirections:
-            # Skip the operator and the following token (the file path)
-            i += 2
-            continue
-
-        # Check if token starts with a redirection (e.g. ">file.txt")
-        starts_with_redir = False
-        for redir in redirections:
-            if token.startswith(redir):
-                # Skip just this token
-                i += 1
-                starts_with_redir = True
-                break
-
-        if starts_with_redir:
+        if redir_pattern.match(token):
+            i += 2 # skip operator and the following file/heredoc marker
             continue
 
         if take_next:
