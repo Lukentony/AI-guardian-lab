@@ -266,7 +266,7 @@ def extract_binaries(command):
     """BUG-04: Robustly extract all binaries from a command chain."""
     # Use regex to insert spaces around all control and redirection operators.
     # This handles attached operators like ls>/dev/null and numeric descriptors like 2>
-    pattern = r'(\s*(;|&&|\|\||\||[0-9]*>>|[0-9]*>\||[0-9]*>&|[0-9]*<&|[0-9]*&>|<<|[0-9]*<|[0-9]*>)\s*)'
+    pattern = r'(\s*(;|&&|\|\||\||[0-9]*>>|[0-9]*>\||[0-9]*>&|[0-9]*<&|[0-9]*&>|[0-9]*<<<|[0-9]*<<|[0-9]*<|[0-9]*>)\s*)'
 
     def replacer(match):
         return f" {match.group(2)} "
@@ -279,7 +279,7 @@ def extract_binaries(command):
         tokens = spaced_command.split()
 
     separators = {';', '&&', '||', '|'}
-    redir_pattern = re.compile(r'^([0-9]*>>|[0-9]*>\||[0-9]*>&|[0-9]*<&|[0-9]*&>|<<|[0-9]*<|[0-9]*>)$')
+    redir_pattern = re.compile(r'^([0-9]*>>|[0-9]*>\||[0-9]*>&|[0-9]*<&|[0-9]*&>|[0-9]*<<<|[0-9]*<<|[0-9]*<|[0-9]*>)$')
 
     binaries = []
     take_next = True
