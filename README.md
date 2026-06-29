@@ -253,6 +253,7 @@ Guardian is a shield, not a miracle:
 
 ## Documentation
 - [Architecture & Layers](docs/ARCHITECTURE.md)
+- [Database Integration & Maintenance](docs/DATABASE.md)
 - [Contributing](docs/CONTRIBUTING.md)
 - [Security Policy](docs/SECURITY.md)
 
