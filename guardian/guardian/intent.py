@@ -17,7 +17,7 @@ INTENT_FAMILIES = {
 }
 
 TASK_KEYWORDS = {
-    "read":    ["list", "show", "check", "read", "view", "display", "get", "find", "search"],
+    "read":    ["list", "show", "check", "read", "view", "display", "get", "find", "search", "analyze"],
     "write":   ["create", "write", "save", "copy", "move", "rename", "update"],
     "delete":  ["delete", "remove", "clean", "clear", "purge", "wipe"],
     "network": ["download", "upload", "fetch", "send", "connect", "ping"],
@@ -87,8 +87,11 @@ def check_intent_mapping(command: str, task: str) -> dict:
         return {"blocked": False, "reason": "Requires LLM validation", "intent_source": "mapping", "needs_llm": True}
         
     combo = (cmd_family, task_family)
-    
-    if combo in BLOCKED_COMBINATIONS:
+
+    # BLOCKED_COMBINATIONS is order-sensitive (task family, command family):
+    # check the inverted tuple too so a conflict is caught regardless of which
+    # side (task or command) carries the destructive intent.
+    if combo in BLOCKED_COMBINATIONS or (task_family, cmd_family) in BLOCKED_COMBINATIONS:
         reason = f"Blocked by Intent Mapping: Command family '{cmd_family}' conflicts with task family '{task_family}'"
         return {"blocked": True, "reason": reason, "intent_source": "mapping", "needs_llm": False}
         
