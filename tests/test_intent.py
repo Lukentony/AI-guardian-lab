@@ -43,6 +43,36 @@ def test_check_intent_mapping():
     assert not res4["blocked"]
     assert res4["needs_llm"]
 
+
+@pytest.mark.parametrize(
+    "command,task",
+    [
+        ("rm -rf /tmp", "list files"),
+        ("ls -la", "delete everything"),
+    ],
+)
+def test_check_intent_mapping_blocks_read_delete_both_orders(command, task):
+    # C-134: a destructive command hidden behind a read task must not pass the
+    # deterministic check, in either order of the task/command tuple.
+    res = check_intent_mapping(command, task)
+    assert res["blocked"], f"expected blocked for {command!r} + {task!r}, got {res}"
+    assert res["intent_source"] == "mapping"
+    assert not res["needs_llm"]
+
+
+def test_classify_task_analyze_disk_usage():
+    # Documented L3 example (README, docs/ATTACK_SCENARIOS.md): the task must
+    # classify as 'read' instead of falling through to LLM validation.
+    assert classify_task("analyze disk usage") == "read"
+
+
+def test_check_intent_mapping_analyze_disk_usage_blocks_delete():
+    res = check_intent_mapping("rm -rf /tmp", "analyze disk usage")
+    assert res["blocked"], res
+    assert res["intent_source"] == "mapping"
+    assert not res["needs_llm"]
+
+
 @patch('intent.completion')
 def test_check_intent_llm(mock_completion):
     # Setup mock response for coherent true
