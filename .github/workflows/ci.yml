@@ -26,7 +26,10 @@ jobs:
           # Install both Guardian and Agent dependencies to prevent ImportErrors during collection
           pip install -r guardian/requirements.txt
           pip install -r agent/requirements.txt
-          pip install pytest requests-mock PyYAML anyio httpx pytest-mock litellm flask-limiter
+          # Test-only extras. litellm and flask-limiter are pinned in the
+          # requirements files above and are not installed again here, so CI
+          # cannot silently upgrade past the pin.
+          pip install pytest requests-mock PyYAML anyio httpx pytest-mock
 
       - name: Run test suite
         run: python -m pytest tests/ -v --tb=short --junitxml=test-results.xml
