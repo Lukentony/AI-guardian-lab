@@ -8,8 +8,6 @@ AI Guardian Lab checks shell commands before a cooperating AI agent runs them.
 The agent proposes a command; Guardian checks it against policy and the task.
 The agent then simulates the action or, when explicitly enabled, executes it.
 
-Created and maintained by [Luca Rivoiro](https://github.com/Lukentony).
-
 > **Research software.** Real execution is disabled by default. Enabling it runs
 > `/bin/bash -c` without a complete OS-level sandbox. Do not give the executor
 > sensitive workspaces or untrusted workloads on the assumption Docker is enough.
