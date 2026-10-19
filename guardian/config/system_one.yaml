@@ -1,0 +1,5 @@
+# Observation only: no probability threshold grants or revokes authorization.
+mode: shadow
+endpoint: http://127.0.0.1:8009/v1/systemone
+model: kev-0.8b-v1.0
+timeout_seconds: 0.5

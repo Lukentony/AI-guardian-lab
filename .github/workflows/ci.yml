@@ -12,62 +12,56 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.11"
-
-      - name: Install dependencies
+      - name: Install test dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Offline regression suite
+        run: python -m pytest --junitxml=test-results.xml
+      - name: Type checks
+        run: pyright guardian database agent ui scripts tests
+      - name: Lint changed runtime surfaces
+        run: >-
+          ruff check guardian database agent ui
+          scripts/evaluate_system_one.py scripts/pattern_learner.py
+          scripts/verify_logs.py
+      - name: Shell syntax
         run: |
-          pip install --upgrade pip
-          # Install both Guardian and Agent dependencies to prevent ImportErrors during collection
-          pip install -r guardian/requirements.txt
-          pip install -r agent/requirements.txt
-          pip install pytest requests-mock PyYAML anyio httpx pytest-mock litellm flask-limiter
-
-      - name: Run test suite
-        run: python -m pytest tests/ -v --tb=short --junitxml=test-results.xml
-
+          bash -n install.sh
+          sh -n guardian/entrypoint.sh system-one/bootstrap.sh
+          sh -n scripts/validate_config.sh
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        # actions/upload-artifact v4, immutable source revision
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: test-results
           path: test-results.xml
-
-      - name: SAST scan (bandit)
+      - name: Compose smoke test (no real command execution)
+        env:
+          API_KEY: ci-agent-key
+          LOG_HMAC_KEY: ci-signing-key
+          TASK_API_KEY: ci-operator-key
+          UI_PASSWORD: ci-ui-password
+          EXECUTE_COMMANDS: "false"
         run: |
-          pip install bandit
-          bandit -r guardian/ -f json -o bandit-report.json || true
-
-      - name: Upload SAST report
-        uses: actions/upload-artifact@v4
-        with:
-          name: bandit-report
-          path: bandit-report.json
-      - name: Docker smoke test
-        run: |
-          cp .env.example .env
-          sed -i "s/API_KEY=CHANGE_ME/API_KEY=ci-test-key-123/" .env
-          # Senior touch: Fix permissions for Docker volumes in CI
-          mkdir -p database guardian/learned
-          chmod -R 777 database guardian/learned
-          
-          export GUARDIAN_BIND_IP=0.0.0.0
-          docker compose up -d --build guardian
-          echo "Waiting for guardian to reach healthy state..."
-          # Better than sleep: retry curl for 30 seconds
-          for i in {1..15}; do
-            if curl -s -f -H "X-API-Key: ci-test-key-123" http://localhost:5000/health; then
-              echo "Guardian is UP!"
-              exit 0
-            fi
-            echo "Waiting... ($i)"
-            sleep 2
-          done
-          echo "ERROR: Guardian failed to start or is unreachable"
-          docker logs lab-guardian
-          exit 1
+          mkdir -p state/audit state/learned
+          chmod 700 state/audit state/learned
+          export LOCAL_UID="$(id -u)" LOCAL_GID="$(id -g)"
+          docker compose config --quiet
+          docker compose up -d --build --wait --wait-timeout 120
+          curl --fail http://127.0.0.1:5000/health
+          curl --fail http://127.0.0.1:5001/health
+          curl --fail http://127.0.0.1:8081/health
+          status=$(curl -s -o /dev/null -w '%{http_code}' \
+            http://127.0.0.1:8081/)
+          test "$status" = 401
+      - name: Stop test containers
+        if: always()
+        run: docker compose down
+        env:
+          API_KEY: ci-agent-key
+          UI_PASSWORD: ci-ui-password

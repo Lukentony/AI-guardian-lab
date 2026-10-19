@@ -1,130 +1,57 @@
-# AI Guardian Lab - Security Guide
+# Security
 
-## Fixed Vulnerabilities (v1.1.0)
+AI Guardian Lab validates commands for cooperating executors. It is a research
+project, not a sandbox. Keep real execution disabled for untrusted workloads.
 
-### ✅ SEC-01: API Authentication (CRITICAL - FIXED)
-**Status**: Resolved in v1.1.0
+## Reporting a vulnerability
 
-All endpoints now require `X-API-Key` header for authentication.
+Do not include credentials, private tasks or working exploit details in a public
+issue. Use GitHub's private vulnerability reporting for this repository if it is
+enabled. Otherwise, contact the maintainer privately to agree on a channel before
+sending sensitive material. This checkout does not establish which private
+reporting channel is currently available.
 
-**Implementation**:
-- API key auto-generated during installation
-- Guardian and Agent validate key on every request
-- 401 Unauthorized returned for missing/invalid keys
+Include the affected revision and a minimal reproduction in an isolated
+environment. State whether the command was merely validated or actually executed.
 
-**Usage**:
-```bash
-API_KEY=$(grep "^API_KEY=" .env | cut -d'=' -f2)
-curl -X POST http://localhost:5001/execute \
-  -H "X-API-Key: $API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"task": "show disk usage"}'
-✅ SEC-03: Pattern Bypass Prevention (CRITICAL - FIXED)
-Status: Resolved in v1.1.0
+## Controls in this revision
 
-Command normalization prevents obfuscated attacks.
+- Guardian and Agent authenticate API requests; only health checks are public.
+  Task registration and pattern approval need a separate operator credential.
+- The shell parser rejects unsupported syntax. The allowlist checks every
+  executable, and regex timeouts deny rather than silently dropping a pattern.
+- Task mapping accounts for chains and redirections. Required semantic review
+  rejects missing, malformed or uncertain replies.
+- Audit decisions are signed in a transactional HMAC chain. Approval and execution
+  outcomes are recorded separately.
+- Compose restricts host exposure to loopback by default. The UI authenticates
+  users and holds its backend credential server-side.
 
-Techniques Blocked:
+Implementation details are in [Architecture](../ARCHITETTURA.md). Results are in
+[Verification](VERIFICATION.md); configured controls should not be mistaken for
+container checks that have already run.
 
-Backslash escaping: r\m -rf / → normalized to rm -rf / → BLOCKED
+## Known limits
 
-Variable substitution: rm${IFS}-rf → normalized to rm -rf → BLOCKED
+An executor can bypass Guardian if it has independent OS access. Integrations
+need a pre-execution hook, not a prompt asking the model to call the API. Command
+and task classification do not provide complete filesystem or network isolation.
 
-Base64 encoding: echo cm0gLXJm | base64 -d → decoded → BLOCKED
+A model's willingness to refuse a dangerous prompt is not a security boundary.
+System One is shadow-only. Its bundled Kev candidate is quarantined because of
+PyTorch advisories and an incompatible dependency constraint; it also failed the
+CPU latency qualification. See [System One](SYSTEM_ONE.md).
 
-Whitespace manipulation: rm -rf → normalized → BLOCKED
+Signing does not encrypt the database or protect a stolen key. Detecting deletion
+of a valid log suffix requires a trusted external checkpoint. Outcome reporting
+assumes an honest executor and does not guarantee exactly-once execution.
 
-Test Results:
+## Operating precautions
 
-rm -rf / → ❌ BLOCKED
+Keep secrets out of task text and logs. Preserve the audit signing key with a
+consistent database backup; rotating it without a migration plan prevents old
+signatures from verifying. Review learned patterns before promotion. Use a shared
+rate-limit store if limits must apply across workers.
 
-r\m -rf /home → ❌ BLOCKED (after normalization)
-
-mk\fs.ext4 /dev/sda → ❌ BLOCKED (after normalization)
-
-df -h → ✅ APPROVED
-
-Active Vulnerabilities
-HIGH
-SEC-02: Input Sanitization
-Agent accepts raw natural language without pre-validation.
-
-Mitigation: Use firewall to restrict API access.
-
-SEC-04: Audit Log Tampering
-SQLite database not encrypted or signed.
-
-Mitigation: Run containers as non-root, mount database read-only from host.
-
-MEDIUM
-SEC-05: LLM Prompt Injection
-Malicious task descriptions might manipulate LLM output.
-
-Mitigation: Modern LLMs (Ollama qwen2.5-coder, GPT-4) have built-in safety filters. Test showed LLM refused to generate rm -rf commands.
-
-SEC-06: Container Escape
-Containers run without user namespace isolation.
-
-Mitigation: Use LAB mode with firewall restrictions. Avoid exposing ports to public internet.
-
-Best Practices
-Deployment
-✅ Use firewall to limit API access (only trusted IPs)
-
-✅ Never expose Agent port (5001) to public internet
-
-✅ Rotate API key periodically
-
-✅ Monitor audit.db for suspicious patterns
-
-✅ Keep patterns.yaml updated with new threats
-
-Configuration
-✅ Use Ollama local for privacy-sensitive environments
-
-✅ Use cloud providers (Groq, OpenAI) with API rate limiting
-
-✅ Enable audit logging to track all commands
-
-✅ Review learned patterns before enabling (confidence >80%)
-
-Monitoring
-✅ Check docker logs lab-guardian for blocked commands
-
-✅ Query audit.db weekly: SELECT * FROM command_history WHERE guardian_approved=0
-
-✅ Alert on repeated pattern matches (potential attack)
-
-Hardening Roadmap
-Phase 1: Core Security (COMPLETED ✅)
-✅ API Authentication
-
-✅ Command normalization
-
-✅ Pattern-based blocking
-
-Phase 2: Enhanced Protection (Planned)
-⏳ JWT-based authentication with expiry
-
-⏳ Rate limiting per API key
-
-⏳ Audit log encryption (SQLCipher)
-
-⏳ Input validation before LLM call
-
-Phase 3: Advanced Detection (Planned)
-⏳ ML-based anomaly detection
-
-⏳ Behavioral analysis (repeated suspicious tasks)
-
-⏳ Real-time security dashboard
-
-⏳ Webhook alerts for critical blocks
-
-Reporting Security Issues
-Report vulnerabilities via GitHub Issues with label security.
-
-DO NOT disclose exploits publicly before fix is available.
-
-Last Updated: 2026-02-13
-Version: 1.1.0 (Security Hardened)
+Do not expose APIs to bypass another framework's SSRF protection. Review remote
+access, hosted-model privacy and an OS-level sandbox separately before deployment.

@@ -1,15 +1,13 @@
-version: "1.1-stable"
+version: "1.2-hardened"
 mode: "enforced"
-
 zones:
   green:
-    description: "Safe commands"
-    binaries: [ls, cat, pwd, echo, date]
-  
+    description: "Read-only inspection and display commands"
+    # df is the documented disk-inspection example.
+    binaries: [ls, cat, pwd, echo, date, df]
   yellow:
-    description: "Logged commands"
+    description: "Network-capable commands requiring coherent authorization"
     binaries: [curl, wget, git]
-  
   red:
-    description: "Dangerous commands"
+    description: "Forbidden commands"
     binaries: [rm, mv, chmod, sudo]

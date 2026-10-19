@@ -1,54 +1,36 @@
-# Attack Corpus
+# Attack corpus
 
-A categorized collection of attack scenarios used to validate AI Guardian Lab's detection capabilities.
+The JSON files contain labelled command examples for manual validation and
+regression work. Their expected verdicts and layer labels reflect the policy
+used when they were written. They need review before use with a changed policy;
+they are not a detection-rate benchmark.
 
-Each file contains labeled examples in JSON format with the following schema:
+## Fields
 
-```json
-{
-  "id": "string",
-  "category": "string",
-  "description": "string",
-  "task": "string",
-  "command": "string",
-  "expected_verdict": "blocked" | "allowed",
-  "expected_layer": "L1" | "L2" | "L3" | "L4" | null,
-  "notes": "string"
-}
-```
+Each example has an `id`, `category`, `description`, `task` and `command`.
+`expected_verdict` is `blocked` or `allowed`; `expected_layer` is `L1`, `L2`, `L3`,
+`L4` or null. `notes` explains the label. A command may now be rejected earlier
+than its historical layer label suggests.
 
-## Categories
+| File | Examples |
+| --- | --- |
+| `obfuscation.json` | 8 obfuscation cases |
+| `reverse-shells.json` | 6 reverse-shell and backdoor cases |
+| `exfiltration.json` | 6 transfer cases |
+| `prompt-injection.json` | 5 prompt-injection cases |
 
-| File | Category | Scenarios |
-|------|----------|-----------|
-| `obfuscation.json` | Command obfuscation techniques | 8 |
-| `reverse-shells.json` | Reverse shell and backdoor payloads | 6 |
-| `exfiltration.json` | Data exfiltration attempts | 6 |
-| `prompt-injection.json` | Prompt injection patterns that generate dangerous commands | 5 |
+## Use
 
-## Usage
+Inspect the strings; do not execute them. For manual API checks, use the
+[authenticated dry-run request](../docs/API.md#authenticated-dry-run-example) on
+an authorized local instance. Keep credentials in the calling process rather
+than copying a key into a script.
 
-Run the full corpus against a live Guardian instance:
+A non-200 response, transport error or malformed reply is a failed check, not an
+observed correct verdict. Require a Boolean `approved` field and report failures
+separately. Do not let a truthiness test turn an API error into a passing blocked
+case.
 
-```bash
-for file in attack-corpus/*.json; do
-  echo "=== $file ==="
-  python3 -c "
-import json, subprocess, sys
-with open('$file') as f:
-    cases = json.load(f)
-for c in cases:
-    r = subprocess.run(['curl','-s','-X','POST','http://localhost:5000/validate',
-        '-H','Content-Type: application/json',
-        '-H','X-API-Key: YOUR_API_KEY',
-        '-d', json.dumps({'command': c['command'], 'task': c['task']})],
-        capture_output=True, text=True)
-    result = json.loads(r.stdout)
-    verdict = 'blocked' if not result.get('approved') else 'allowed'
-    status = '✓' if verdict == c['expected_verdict'] else '✗'
-    print(f\"{status} [{c['id']}] {c['description']}: {verdict}\")
-"
-done
-```
-
-_This corpus is used for regression testing and to demonstrate Guardian's detection surface._
+The current offline suite and its limits are described in
+[Verification](../docs/VERIFICATION.md). Current examples with inspected validator
+sources are in [Attack scenarios](../docs/ATTACK_SCENARIOS.md).

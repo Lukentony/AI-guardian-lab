@@ -1,317 +1,108 @@
-# AI Guardian Lab - Installation Guide
+# Installation and upgrade
 
-## Prerequisites
+Installation starts services on the chosen host. Use it for local research, not
+as a production sandbox. These instructions do not use sudo, change the firewall
+or deploy to a remote machine.
 
-- **Docker** 20.10+ and **Docker Compose** 1.29+
-- **4GB RAM** minimum (8GB recommended for local LLM)
-- **Internet connection** for cloud providers or Ollama model download
-- **Optional**: Ollama installed locally or accessible remotely
+## First installation
 
-## Quick Start (Recommended)
-
-### 1. Clone Repository
+On the machine chosen to run the lab, open a dedicated terminal in the repository
+root. Prerequisites are Docker with Compose v2 (`--wait` support), Python 3, curl
+and a non-root account authorized to use Docker. GPU support is not required for
+the baseline; the optional model service needs separate memory and model storage.
 
 ```bash
-git clone <repository-url>
-cd ai-lab
-2. Run Interactive Installer
-bash
-chmod +x install.sh
 ./install.sh
-The wizard will guide you through:
-
-Step 1: Ollama Detection
-
-Automatically detects local Ollama installation
-
-Prompts for remote Ollama host if not found locally
-
-Suggests cloud alternatives if Ollama unavailable
-
-Step 2: LLM Provider Selection
-
-Ollama (Local - Recommended for privacy)
-
-Free, private, runs offline
-
-Models: qwen2.5-coder, deepseek-coder, llama3.2
-
-Groq (Cloud - FREE tier)
-
-Fast inference, generous free quota
-
-No credit card required
-
-OpenAI (Cloud - Paid)
-
-Best quality, GPT-4o
-
-~$0.01-0.03 per command
-
-Anthropic Claude (Cloud - Paid)
-
-Smart reasoning, safety-focused
-
-~$0.015 per command
-
-DeepSeek (Cloud - Paid)
-
-Most cost-effective
-
-~$0.001 per command (100x cheaper than OpenAI)
-
-Google Gemini (Cloud - Paid)
-
-Step 3: API Key Configuration
-
-Tests connectivity before proceeding
-
-Validates API keys automatically
-
-Supports multi-provider fallback setup
-
-Step 4: Port Configuration
-
-Default ports: 5000 (Guardian), 5001 (Agent), 8080 (UI)
-
-Customizable if conflicts exist
-
-Step 5-8: Automatic build and deployment
-
-Generates .env file
-
-Builds Docker images
-
-Starts services with health checks
-
-3. Verify Installation
-After installation completes, test the system:
-
-bash
-# Test safe command (should execute)
-curl -X POST http://localhost:5001/execute \
-  -H "Content-Type: application/json" \
-  -d '{"task": "show disk usage"}'
-
-# Test dangerous command (should be blocked)
-curl -X POST http://localhost:5001/execute \
-  -H "Content-Type: application/json" \
-  -d '{"task": "format disk with mkfs.ext4"}'
-Access Web Dashboard: http://localhost:8080
-
-Manual Installation
-1. Clone Repository
-bash
-git clone <repository-url>
-cd ai-lab
-2. Configure Environment
-bash
-cp .env.example .env
-nano .env
-Minimum required configuration:
-
-For Ollama (local):
-
-text
-LLM_PROVIDER=ollama
-OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL_CODER=qwen2.5-coder:7b
-OLLAMA_MODEL_EXPLAIN=llama3.2:3b-instruct-q4_K_M
-For Groq (cloud free):
-
-text
-LLM_PROVIDER=groq
-GROQ_API_KEY=gsk_xxxxxxxxxxxxx
-LLM_MODEL_CODER=llama-3.3-70b-versatile
-LLM_MODEL_EXPLAIN=llama-3.1-8b-instant
-For OpenAI (cloud):
-
-text
-LLM_PROVIDER=openai
-OPENAI_API_KEY=sk-proj-xxxxxxxxxxxxx
-LLM_MODEL_CODER=gpt-4o
-LLM_MODEL_EXPLAIN=gpt-4o-mini
-See CONFIGURATION.md for all provider options.
-
-3. Build Docker Images
-bash
-docker build -t guardian-mvp:latest -f guardian/Dockerfile guardian/
-docker build -t agent-mvp:latest -f agent/Dockerfile agent/
-docker build -t ui-mvp:latest -f ui/Dockerfile ui/
-4. Start Services
-bash
-docker-compose up -d
-5. Verify Health
-bash
-docker ps | grep lab-
-docker logs lab-agent --tail 20
-docker logs lab-guardian --tail 20
-Installation Scenarios
-Scenario 1: Local Machine with Ollama
-Best for: Privacy, offline work, development
-
-Install Ollama: https://ollama.ai/download
-
-Pull models: ollama pull qwen2.5-coder:7b
-
-Run installer: ./install.sh → Select Ollama
-
-Result: Fully private, no API costs
-
-Scenario 2: Cloud-Only (No Local LLM)
-Best for: Quick testing, no GPU available
-
-Get Groq API key (free): https://console.groq.com
-
-Run installer: ./install.sh → Select Groq
-
-Result: Fast inference, free tier limits
-
-Scenario 3: Remote Ollama Server
-Best for: Team setup, shared LLM infrastructure
-
-Note your Ollama server IP (e.g., 192.168.x.x:11434)
-
-Run installer: ./install.sh → Enter remote host
-
-Result: Centralized LLM, multiple Guardian instances
-
-Scenario 4: Hybrid Setup (Ollama + Cloud Fallback)
-Best for: Production reliability
-
-Configure Ollama as primary
-
-Add Groq/OpenAI API key during wizard
-
-LiteLLM automatically falls back on Ollama failure
-
-Result: Local speed + cloud reliability
-
-Ollama Setup
-Install Ollama
-Linux:
-
-bash
-curl -fsSL https://ollama.ai/install.sh | sh
-macOS/Windows: Download from https://ollama.ai
-
-Pull Recommended Models
-bash
-# Code generation (7GB)
-ollama pull qwen2.5-coder:7b
-
-# Alternative: DeepSeek Coder (4GB)
-ollama pull deepseek-coder:6.7b
-
-# Explanation (lighter, 2GB)
-ollama pull llama3.2:3b-instruct-q4_K_M
-Remote Ollama Access
-If running Ollama on another machine:
-
-bash
-# On Ollama host, allow external connections
-OLLAMA_HOST=0.0.0.0:11434 ollama serve
-
-# In Guardian .env, set remote host
-OLLAMA_URL=http://192.168.x.x:11434
-Post-Installation
-Validate Configuration
-bash
-./scripts/validate_config.sh
-View Logs
-bash
-docker logs lab-agent -f
-docker logs lab-guardian -f
-docker logs lab-ui -f
-Test Commands
-bash
-# Safe command (approved)
-curl -X POST http://localhost:5001/execute \
-  -H "Content-Type: application/json" \
-  -d '{"task": "list files in current directory"}'
-
-# Dangerous command (blocked)
-curl -X POST http://localhost:5001/execute \
-  -H "Content-Type: application/json" \
-  -d '{"task": "delete all files with rm -rf"}'
-Access Web UI
-Open browser: http://localhost:8080
-
-Troubleshooting
-Port Already in Use
-bash
-docker-compose down
-# Change ports in .env
-nano .env
-# Update: GUARDIAN_PORT=5010, AGENT_PORT=5011, UI_PORT=8888
-docker-compose up -d
-Ollama Connection Failed
-bash
-# Test Ollama directly
-curl http://localhost:11434/api/tags
-
-# If remote Ollama, check firewall
-ping <ollama-host-ip>
-telnet <ollama-host-ip> 11434
-Guardian Blocks Everything
-bash
-# Check pattern loading
-docker logs lab-guardian | grep "INIT"
-
-# Expected output:
-# [INIT] Loaded 12 static patterns from YAML
-# [INIT] Loaded 6 learned patterns
-
-# Review patterns
-cat guardian/config/patterns.yaml
-API Key Invalid
-bash
-# Test OpenAI key
-curl https://api.openai.com/v1/models \
-  -H "Authorization: Bearer YOUR_API_KEY"
-
-# Test Groq key
-curl https://api.groq.com/openai/v1/models \
-  -H "Authorization: Bearer YOUR_API_KEY"
-
-# Update in .env
-nano .env
-docker-compose restart
-Container Won't Start
-bash
-# Check logs for errors
-docker logs lab-agent
-docker logs lab-guardian
-
-# Common issues:
-# - Missing requirements.txt (rebuild images)
-# - Port conflicts (change ports in .env)
-# - Network conflicts (docker network prune)
-LLM Response Timeout
-bash
-# Increase timeout in agent/main.py or use faster model
-# For Ollama: Use smaller models (llama3.2:3b vs 70b)
-# For cloud: Use fast models (gpt-4o-mini, claude-haiku, groq)
-Uninstall
-bash
-cd ai-lab
-docker-compose down -v
-docker rmi guardian-mvp:latest agent-mvp:latest ui-mvp:latest
-rm -rf database/ workspace/
-Next Steps
-Read CONFIGURATION.md for advanced LLM setup
-
-Review SECURITY.md for hardening production deployments
-
-Check API.md for integration examples
-
-Customize patterns in guardian/config/patterns.yaml
-
-Support
-Documentation: docs/ folder
-
-Issues: GitHub Issues
-
-Configuration help: CONFIGURATION.md
-
-Security concerns: SECURITY.md
+```
+
+The provider wizard creates a private `.env` with separate API, operator, audit,
+UI and model keys. It sets the host UID/GID, uses `LLM_MODEL_CODER` consistently
+and leaves `EXECUTE_COMMANDS=false`. Keys are not printed. An existing `.env` or
+legacy audit database stops installation rather than being overwritten or migrated.
+The installer does not start the System One profile.
+
+Configure a local Ollama service explicitly. Compose uses
+`http://host.docker.internal:11434` by default; both Guardian and Agent have the
+Linux host-gateway mapping. The generator and semantic reviewer need their
+selected models installed. Missing semantic inference denies ambiguous commands.
+There is no automatic cloud fallback. Choosing a hosted generator shares task
+data with that provider.
+
+Compose owns build contexts. Guardian builds from the repository root; Agent
+and UI build from their service directories. Health checks use Python's standard
+library, not an undeclared curl binary. UI uses Gunicorn and Basic authentication,
+and retrieves audit data through Guardian without any database mount.
+
+## Existing configuration or data
+
+Do not rerun the installer over existing settings: it deliberately stops rather
+than rotating a signing key. Back up `.env` privately and preserve the old audit
+key. Review `.env.example` for new names: `LLM_MODEL_CODER`, `EXECUTE_COMMANDS`,
+`TASK_API_KEY`, UI credentials and optional System One settings.
+
+Current Compose data paths are `state/audit` and `state/learned`; application code
+is not mounted writable as a data directory. Match `LOCAL_UID`/`LOCAL_GID` to the
+non-root host owner of these directories. Do not solve permissions with chmod 777.
+
+If an older checkout contains `database/audit.db`, stop its writers using its own
+Compose project first. On that same host, from that checkout's repository root,
+use SQLite's backup API to obtain a consistent snapshot (including committed WAL
+content), rather than copying only a live `.db` file:
+
+```bash
+python3 - <<'PY'
+import sqlite3
+from pathlib import Path
+source = Path('database/audit.db')
+target = Path('state/audit/audit.db')
+if not source.is_file() or target.exists():
+    raise SystemExit('Source missing or destination already exists; stop and inspect')
+target.parent.mkdir(parents=True, exist_ok=True)
+with sqlite3.connect(f'file:{source}?mode=ro', uri=True) as old:
+    with sqlite3.connect(target) as new:
+        old.backup(new)
+print('Snapshot copied; original database preserved')
+PY
+```
+
+Keep the original and private configuration backup. On first startup the shared
+audit module adds missing columns transactionally without rewriting old records.
+Unsigned history remains explicitly unverifiable; it is not silently signed as
+if it had always been authentic. The verifier reports that distinction.
+
+Review historical learned patterns before importing them. The old nested format
+is readable, but statistical suggestions must not become reviewed policy merely
+because a token occurred frequently. Active reviewed patterns belong under
+`state/learned/learned_patterns.yaml`, not the read-only config mount.
+
+After reviewing changes on the target host, use Compose directly instead of the
+first-install wizard. The deployment owner is responsible for the actual build,
+health checks, backups and rollback. Local development without Docker does not
+prove image startup or bind-mount permissions.
+
+## Development checks without Docker
+
+On the development machine, open a dedicated terminal at the repository root.
+With uv available, prepare the environment and run the tests:
+
+```bash
+uv venv --python 3.11 .venv
+uv pip install --python .venv/bin/python -r requirements-dev.txt
+.venv/bin/python -m pytest
+```
+
+Tests use temporary databases, block unmatched HTTP and mock semantic inference.
+Agent tests are enabled. A subprocess test imports real package paths without
+the legacy test aliases. The optional CPU service has a separate environment:
+see [System One](SYSTEM_ONE.md).
+
+## Recovery and operational limits
+
+- Preserve state directories and signing keys when rebuilding images.
+- Never claim a valid audit prefix proves that no valid suffix was deleted;
+  trusted external checkpoints are still needed.
+- After an uncertain execution/report timeout, inspect the validation identity
+  and executor state. There is no durable exactly-once execution guarantee.
+- Keep real execution disabled until an appropriate OS-level sandbox is supplied.
+- Do not expose the UI or APIs remotely merely to bypass an integration's SSRF
+  policy; use an explicitly authorized authenticated integration.

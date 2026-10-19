@@ -26,13 +26,13 @@
     {
         "command": "ls /tmp",
         "task": "",
-        "expected": "approved",
-        "note": "empty task — skip intent check"
+        "expected": "denied",
+        "note": "empty task is not authorization"
     },
     {
         "command": "ls /tmp",
         "task": "test",
-        "expected": "approved",
-        "note": "short task — skip intent check"
+        "expected": "denied",
+        "note": "unclear task requires review; offline model unavailable"
     }
 ]

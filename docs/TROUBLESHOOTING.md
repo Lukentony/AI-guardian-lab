@@ -1,89 +1,87 @@
-# Troubleshooting / Risoluzione Problemi
+# Troubleshooting / Risoluzione problemi
 
-[🇬🇧 English](#english) | [🇮🇹 Italiano](#italiano)
+[English](#english) | [Italiano](#italiano)
 
----
+## English
 
-<a name="english"></a>
-## 🇬🇧 English
+Run these checks on the host running the lab, from a dedicated terminal at the
+repository root. Do not paste `.env`, expanded Compose output or unredacted logs
+into a public issue.
 
-If you encounter errors like `Ollama API error` or `500 Internal Server Error` during testing, follow these steps:
+### A service does not start
 
-### 1. Check Ollama Models
-Ensure you have the correct model pulled locally:
+Inspect service state first:
+
 ```bash
-ollama list
-```
-You should see `qwen2.5-coder:1.5b` (or whatever model you selected).
-
-### 2. Check Docker Logs
-View the full logs of the Agent container to see the exact error:
-```bash
-docker logs lab-agent
+docker compose ps
 ```
 
-### 3. Verify Connectivity
-Test if the Agent container can reach Ollama on the host:
+Use the relevant service name when inspecting logs, for example
+`docker compose logs guardian`. Check state-directory ownership against
+`LOCAL_UID` and `LOCAL_GID`. Do not use chmod 777 or rerun the installer over an
+existing `.env`; follow [Install](INSTALL.md) for upgrades.
+
+### Ollama or semantic review fails
+
+Check the models on the machine that actually runs Ollama. `LLM_MODEL_CODER` and
+`INTENT_LLM_MODEL` can name different models, and both must be available when used.
+The Compose host-gateway address is not the same as localhost inside a container.
+
+An unavailable or malformed required semantic response denies validation. Do not
+turn off failure handling to get an approval. Use the
+[authenticated dry-run example](API.md#authenticated-dry-run-example) to test
+validation without executing a command.
+
+### The UI returns 401 or 503
+
+401 requires valid UI Basic credentials. A dashboard 503 can indicate an
+unavailable Guardian audit API. Check Guardian and the UI backend credential;
+do not work around the error by sharing the SQLite volume.
+
+### The optional model will not start
+
+The Kev CPU service is quarantined because its PyTorch requirements conflict with
+security updates. This is intentional. See [System One](SYSTEM_ONE.md); do not
+bypass the gate or treat an unavailable observer as a safety verdict.
+
+## Italiano
+
+Esegui questi controlli sul computer che ospita il lab, in un terminale dedicato
+aperto nella directory principale del repository. Non pubblicare `.env`, output
+Compose con variabili espanse o log contenenti dati riservati.
+
+### Un servizio non parte
+
+Controlla prima lo stato:
+
 ```bash
-docker exec lab-agent curl http://host.docker.internal:11434/api/tags
-```
-If this fails, check your Docker Desktop settings (Allow connection to host).
-
-### 4. Manual Test
-You can manually trigger the agent using `curl`:
-```bash
-curl -X POST http://localhost:5001/execute \
-     -H "Content-Type: application/json" \
-     -H "X-API-Key: test_secret_key" \
-     -d '{"task": "echo hello"}'
-```
-
-### 5. Model Selection
-The `install.sh` script supports interactive model selection. Run it to easily configure your environment:
-```bash
-./install.sh
-```
-It will query your running Ollama instance and let you pick from available models.
-
----
-
-<a name="italiano"></a>
-## 🇮🇹 Italiano
-
-Se incontri errori come `Ollama API error` o `500 Internal Server Error` durante i test, segui questi passaggi:
-
-### 1. Controlla i Modelli Ollama
-Assicurati di avere il modello corretto installato localmente:
-```bash
-ollama list
-```
-Dovresti vedere `qwen2.5-coder:1.5b` (o il modello che hai selezionato).
-
-### 2. Controlla i Log di Docker
-Visualizza i log completi del container Agent per vedere l'errore esatto:
-```bash
-docker logs lab-agent
-```
-
-### 3. Verifica la Connettività
-Testa se il container Agent riesce a raggiungere Ollama sull'host:
-```bash
-docker exec lab-agent curl http://host.docker.internal:11434/api/tags
-```
-Se fallisce, controlla le impostazioni di Docker Desktop (Consenti connessione all'host).
-
-### 4. Test Manuale
-Puoi attivare manualmente l'agent usando `curl`:
-```bash
-curl -X POST http://localhost:5001/execute \
-     -H "Content-Type: application/json" \
-     -H "X-API-Key: test_secret_key" \
-     -d '{"task": "echo ciao"}'
+docker compose ps
 ```
 
-### 5. Selezione Modello
-Lo script `install.sh` supporta la selezione interattiva del modello. Eseguilo per configurare facilmente il tuo ambiente:
-```bash
-./install.sh
-```
-Interrogherà la tua istanza Ollama in esecuzione e ti permetterà di scegliere tra i modelli disponibili.
+Per i log usa il nome del servizio, per esempio `docker compose logs guardian`.
+Verifica che il proprietario delle directory di stato corrisponda a `LOCAL_UID`
+e `LOCAL_GID`. Non usare chmod 777 e non rilanciare l'installer su una `.env`
+esistente. La procedura di aggiornamento è in [Install](INSTALL.md).
+
+### Ollama o la verifica semantica non rispondono
+
+Controlla i modelli sul computer dove gira Ollama. `LLM_MODEL_CODER` e
+`INTENT_LLM_MODEL` possono indicare modelli diversi. L'indirizzo host-gateway di
+Compose non coincide con localhost dentro il container.
+
+Se una verifica semantica necessaria fallisce, il comando viene rifiutato. Non
+disattivare questo controllo per ottenere un'approvazione. Usa
+[l'esempio autenticato](API.md#authenticated-dry-run-example) per provare la
+validazione senza eseguire comandi.
+
+### La UI restituisce 401 o 503
+
+401 richiede credenziali Basic valide per la UI. Un 503 nella dashboard può
+indicare che l'API di audit di Guardian non risponde. Controlla Guardian e la
+credenziale del backend UI; non condividere il volume SQLite per aggirare l'errore.
+
+### Il modello opzionale non parte
+
+Il servizio Kev CPU è in quarantena: i suoi requisiti PyTorch sono incompatibili
+con gli aggiornamenti di sicurezza. Il blocco è intenzionale. Leggi
+[System One](SYSTEM_ONE.md), senza aggirare il controllo di avvio.

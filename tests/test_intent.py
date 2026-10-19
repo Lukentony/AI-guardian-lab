@@ -1,47 +1,45 @@
-import sys
-import os
+"""Regression coverage for complete command effects and strict semantic responses."""
+
+from types import SimpleNamespace
+
 import pytest
-from unittest.mock import patch, MagicMock
 
-# Absolute project root
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.append(PROJECT_ROOT)
+from guardian.guardian import intent
 
-from intent import classify_command, classify_task, check_intent_mapping, check_intent_llm
 
-def test_classify_command():
-    assert classify_command("ls -la") == "read"
-    assert classify_command("curl http://example.com") == "network"
-    assert classify_command("unknown_binary") is None
-    assert classify_command("") is None
+def response(content):
+    return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])
 
-def test_classify_task():
-    assert classify_task("list all files") == "read"
-    assert classify_task("delete old logs") == "delete"
-    assert classify_task("") is None # empty skip
-    assert classify_task("test") is None # <=5 chars skip
 
-def test_check_intent_mapping():
-    # read command + read task -> not blocked
-    res1 = check_intent_mapping("ls -la", "list files")
-    assert not res1["blocked"]
-    assert res1["intent_source"] == "mapping"
-    
-    # read command + delete task -> blocked
-    res2 = check_intent_mapping("ls -la", "delete everything")
-    assert res2["blocked"]
-    assert res2["intent_source"] == "mapping"
-    assert "conflicts with task family" in res2["reason"]
-    
-    # task skip -> approved
-    res3 = check_intent_mapping("ls -la", "")
-    assert not res3["blocked"]
-    assert res3["intent_source"] == "skip"
-    
-    # needs llm -> unclassifiable command
-    res4 = check_intent_mapping("date", "check time")
-    assert not res4["blocked"]
-    assert res4["needs_llm"]
+@pytest.mark.parametrize(
+    "command,expected",
+    [
+        ("ls -la", "read"),
+        ("curl http://example.com", "network"),
+        ("unknown_binary", None),
+        ("", None),
+        ("ls && curl http://example.com", None),
+        ("cat file > target", None),
+    ],
+)
+def test_classify_command(command, expected):
+    assert intent.classify_command(command) == expected
+
+
+@pytest.mark.parametrize(
+    "task,expected",
+    [
+        ("list all files", "read"),
+        ("delete old logs", "delete"),
+        ("analyze disk usage", "read"),
+        ("elenca tutti i file", "read"),
+        ("check and delete logs", None),
+        ("", None),
+        ("test", None),
+    ],
+)
+def test_classify_task(task, expected):
+    assert intent.classify_task(task) == expected
 
 
 @pytest.mark.parametrize(
@@ -49,57 +47,53 @@ def test_check_intent_mapping():
     [
         ("rm -rf /tmp", "list files"),
         ("ls -la", "delete everything"),
+        ("curl https://example.com", "read project notes"),
+        ("cat file > target", "read project notes"),
     ],
 )
-def test_check_intent_mapping_blocks_read_delete_both_orders(command, task):
-    # C-134: a destructive command hidden behind a read task must not pass the
-    # deterministic check, in either order of the task/command tuple.
-    res = check_intent_mapping(command, task)
-    assert res["blocked"], f"expected blocked for {command!r} + {task!r}, got {res}"
-    assert res["intent_source"] == "mapping"
-    assert not res["needs_llm"]
+def test_conflicts(command, task):
+    assert intent.check_intent_mapping(command, task)["blocked"]
 
 
-def test_classify_task_analyze_disk_usage():
-    # Documented L3 example (README, docs/ATTACK_SCENARIOS.md): the task must
-    # classify as 'read' instead of falling through to LLM validation.
-    assert classify_task("analyze disk usage") == "read"
+def test_missing_and_mixed_tasks():
+    assert intent.check_intent_mapping("ls", "")["blocked"]
+    assert intent.check_intent_mapping("ls", "test")["needs_llm"]
+    assert intent.check_intent_mapping("ls", "check and delete logs")["needs_llm"]
 
 
-def test_check_intent_mapping_analyze_disk_usage_blocks_delete():
-    res = check_intent_mapping("rm -rf /tmp", "analyze disk usage")
-    assert res["blocked"], res
-    assert res["intent_source"] == "mapping"
-    assert not res["needs_llm"]
+@pytest.mark.parametrize(
+    "content",
+    [
+        "{}",
+        "[]",
+        "null",
+        "not JSON",
+        '{"coherent": "false", "confidence": 1, "reason": "bad"}',
+        '{"coherent": true, "confidence": true, "reason": "bad"}',
+        '{"coherent": true, "confidence": NaN, "reason": "bad"}',
+        '{"coherent": true, "confidence": 1.1, "reason": "bad"}',
+        '{"coherent": false, "confidence": 0.5, "reason": "unsure"}',
+        '{"coherent": true, "confidence": 0.5, "reason": "unsure"}',
+        '{"coherent": true, "confidence": 1}',
+    ],
+)
+def test_invalid_or_uncertain_model_never_approves(monkeypatch, content):
+    monkeypatch.setattr(intent, "completion", lambda **kwargs: response(content))
+    assert intent.check_intent_llm("date", "check time")["blocked"]
 
 
-@patch('intent.completion')
-def test_check_intent_llm(mock_completion):
-    # Setup mock response for coherent true
-    mock_response = MagicMock()
-    mock_response.choices = [MagicMock()]
-    mock_response.choices[0].message.content = '{"coherent": true, "confidence": 0.9, "reason": "test"}'
-    mock_completion.return_value = mock_response
-    
-    res1 = check_intent_llm("date", "check the current time")
-    assert not res1["blocked"]
-    assert res1["intent_source"] == "llm"
-    assert res1["confidence"] == 0.9
-    
-    # Setup mock response for blocked
-    mock_response.choices[0].message.content = '{"coherent": false, "confidence": 0.8, "reason": "danger"}'
-    res2 = check_intent_llm("date", "delete everything")
-    assert res2["blocked"]
-    assert res2["intent_source"] == "llm"
-    
-    # Setup mock response for low confidence -> not blocked
-    mock_response.choices[0].message.content = '{"coherent": false, "confidence": 0.5, "reason": "unsure"}'
-    res3 = check_intent_llm("date", "maybe delete")
-    assert not res3["blocked"]
-    assert res3["intent_source"] == "llm"
-    
-    # Error fallback (Senior Level: Fail-Closed)
-    mock_completion.side_effect = Exception("API error")
-    res4 = check_intent_llm("date", "test")
-    assert res4["blocked"] # Changed from False to True for Fail-Closed security
-    assert res4["intent_source"] == "llm_error"
+def test_valid_model_contract_and_bounded_timeout(monkeypatch):
+    calls = []
+
+    def complete(**kwargs):
+        calls.append(kwargs)
+        return response('{"coherent": true, "confidence": 0.95, "reason": "Matches task"}')
+
+    monkeypatch.setattr(intent, "completion", complete)
+    assert not intent.check_intent_llm("date", "check time")["blocked"]
+    assert calls[0]["timeout"] <= 3 and calls[0]["max_retries"] == 0
+
+
+def test_unavailable_denies_even_with_obsolete_fail_open_setting(monkeypatch):
+    monkeypatch.setenv("FAIL_CLOSED_ON_LLM_ERROR", "false")
+    assert intent.check_intent_llm("date", "check time")["blocked"]

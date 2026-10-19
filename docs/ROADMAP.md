@@ -1,34 +1,27 @@
-# Project Roadmap
+# Roadmap
 
-This document outlines the current status, planned features, and architectural evolution of **AI Guardian Lab**.
+The hardening branch repairs the v1.2.0 validator and adds a shadow-mode System
+One client. It remains a research lab. See [Verification](VERIFICATION.md) for
+measured results rather than treating this roadmap as a completion record.
 
----
+## Next work
 
-## 🚀 Status: v1.2.0 (Stable Demo)
-The core multi-layer defense pipeline is implemented and verified through synthetic datasets.
+- Verify the ordinary-service Compose build and persistent-state recovery on a
+  Docker-equipped test host.
+- Find a compatible patched model runtime. The current Kev candidate requires a
+  vulnerable PyTorch range and is quarantined.
+- Evaluate a reviewed replacement on independent workloads. The measured CPU
+  candidate missed the 500 ms budget on every calibration case.
+- Add OS-level isolation before executing untrusted commands.
+- Define recovery for uncertain execution outcomes; the executor does not provide
+  durable exactly-once execution.
 
-### Current Features
-- **L1 Binary Allowlist:** Prevents unauthorized binaries from executing in the shell.
-- **L2 Regex Engine:** Detects obfuscation patterns (e.g., base64 in bash) and dangerous flags.
-- **L3 Intent Coherence:** Cross-references the high-level task intent with the actual shell command actions.
-- **L4 LLM Semantic Check:** Deep analysis of ambiguous commands for final validation.
-- **Forensics API:** Detailed audit logging for post-incident analysis and pattern learning.
+## Later options
 
----
+Shared rate-limit storage would be needed for deployment across multiple workers.
+Finer permissions and additional forensic views are possible follow-up work, not
+implemented guarantees. Additional model providers need their own license and
+privacy review.
 
-## 🛠️ Planned Improvements
-
-### High Priority
-- [ ] **Sandboxing (gVisor/Firejail):** Add a proper isolation layer for the agent container to prevent container escapes.
-- [ ] **Advanced Pattern Learning:** Automated generation of regex patterns from blocked malicious attempts.
-- [ ] **Fine-grained RBAC:** Implement Role-Based Access Control for the Guardian API.
-
-### Medium Priority
-- [ ] **Redis Backend for Rate Limiting:** Move from memory-based to persistent rate limiting for distributed deployments.
-- [ ] **Interactive Dashboard (V2):** Enhanced visualizations of threat trends and decision reasoning.
-- [ ] **Support for more LLM Providers:** Native integration for Anthropic and Azure OpenAI.
-
----
-
-## 📈 Long-term Vision
-Transform AI Guardian Lab from a demonstration middleware into a production-ready **Safety and Governance layer** for enterprise-grade AI agents, focusing on deterministic security with LLM-assisted oversight.
+Pattern mining already produces suggestions. Automatic policy promotion is not
+a goal: an operator must review a pattern before it becomes active.

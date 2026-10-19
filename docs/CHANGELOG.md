@@ -1,54 +1,57 @@
 # Changelog
 
-## [1.2.0] - 2026-03-06
-### Added
-- **Intent Coherence Layer (L4)**: deterministic task/command family mapping — blocks conflicts without LLM calls.
-- **LLM Semantic Check (L5)**: called only for ambiguous cases unresolved by the mapping.
-- **`intent_source` field in API response**: "mapping", "llm", or "skip" for audit transparency.
+Entries below record earlier releases. Their original layer numbering and security
+claims are historical, not verification of the current branch. The hardening work
+uses L3 for deterministic intent mapping and L4 for semantic review. See
+[Verification](VERIFICATION.md) for current results.
 
-### Fixed
-- Removed hardcoded private IP from `OLLAMA_URL` default fallback in `intent.py`.
-- Fixed relative import error in `main.py` for Gunicorn compatibility.
-- Added `pytest` to guardian requirements for container test execution.
-- Fixed Docker build context to include `tests/` directory.
+## Unreleased hardening branch
+
+- Added restricted shell parsing and complete command-effect checks.
+- Replaced worker-thread regex timeouts with engine-enforced timeouts that deny
+  on failure. Required semantic responses now use strict validation.
+- Unified audit storage and signing, repaired forensic argument handling, and
+  made pattern promotion an operator action.
+- Repaired installation and UI access. Added a shadow-only System One client.
+- Quarantined the CPU model candidate after latency and dependency-security
+  checks failed. Container verification remains pending.
+
+## [1.2.0] - 2026-03-06
+
+Added deterministic task/command mapping and semantic review for ambiguous cases,
+then labelled L4 and L5. Added `intent_source` values `mapping`, `llm` and `skip`.
+Removed a hardcoded private Ollama address and fixed Gunicorn-relative imports.
+Added pytest and tests to the Guardian build at that time; the current branch
+keeps pytest in development requirements instead.
 
 ## [1.1.4] - 2026-03-05
-### Fixed
-- **Critical**: Fixed `safe_compile()` producing invalid `.*??` double quantifiers when patterns already contained non-greedy `.*?`. Replaced naive `str.replace` with `re.sub` using negative lookahead, plus a sanitization pass. Restores 5 previously broken security patterns at startup.
+
+Fixed invalid `.*??` quantifiers produced by `safe_compile()` when a pattern
+already contained `.*?`. The release recorded five patterns restored at startup.
+The current engine does not rewrite regex semantics this way.
 
 ## [1.1.3] - 2026-02-19
-### Fixed
-- **Critical**: Resolved `ValueError` crash in `/validate` triggered by dynamic pattern learning (BUG-01).
-- **Critical**: Fixed `/learn` persistence by moving learned patterns to a writable volume (BUG-02).
-- **Critical**: Hardened Agent against DoS via malformed JSON (BUG-03).
-- **Critical**: Re-engineered allowlist logic with `shlex` to detect chained binaries in pipes/concatenations (BUG-04).
-- **Performance**: Optimized `ThreadPoolExecutor` with core-scaling and concurrency semaphores (BUG-05).
-- **Security**: Hardened `/health` endpoint against information disclosure (BUG-06).
+
+Addressed dynamic-learning validation crashes (BUG-01), learned-pattern persistence
+(BUG-02) and malformed Agent JSON (BUG-03). Introduced shlex-based chained-binary
+checks (BUG-04), worker/concurrency changes (BUG-05) and reduced health-endpoint
+information (BUG-06). Later inspection found further gaps; these entries do not
+establish that those mechanisms were complete.
 
 ## [1.1.2] - 2026-02-19
-### Fixed
-- **Critical**: Added explicit execution markers to Agent container logs for subprocess validation.
-- **Critical**: Re-architected normalization vs. pattern matching sequence in Guardian to prevent "Normalization Stripping" bypasses.
-- **Critical**: Verified and hardened `/report` endpoint for external audit logging.
-- **Security**: Reinforced Fail-Closed defaults in `policy.yaml`.
+
+Added subprocess execution markers, changed normalization and pattern-check order,
+updated report handling and configured fail-closed policy defaults.
 
 ## [1.1.1] - 2026-02-14
-### Fixed
-- Corrected release version naming (v1.1.1 patch).
-- Cleaned up legacy development artifacts from GitHub repository.
 
-### Added
-- **Zonal Enforcement (SEC-03b)**: Strict binary allowlisting via `policy.yaml`. Blocks any command not explicitly permitted.
-- **Resource Sandboxing**: CPU (0.5-0.75) and Memory (256MB-1GB) limits enforced per container in `docker-compose.yml`.
-- **Advanced Audit**: JSON-formatted structured logging for all security decisions.
+Corrected version naming and removed development artifacts. Added zonal binary
+allowlisting, Compose resource limits of 0.5-0.75 CPU and 256 MB-1 GB at that
+revision, and JSON security logs.
 
 ## [1.1.0] - 2026-02-18
 
-### Added
-- **SEC-02 (Rate Limiting)**: Standardized rate limiting using `Flask-Limiter` in the Guardian service (60 req/min).
-- **SEC-03 (ReDoS Protection)**: Real-time regex timeouts (1.0s) implemented using `ThreadPoolExecutor` to prevent Denial of Service attacks.
-- **SEC-01 (Hardened Auth)**: Fail-closed authentication in both Agent and Guardian — requests are rejected with 401 if `API_KEY` is not set.
-- **Universal Provider Support**: Full integration with LiteLLM for Ollama, OpenAI, Groq, and DeepSeek.
-
----
-*"Security first. Because you can't control the randomness of an LLM with another random LLM."*
+Added Flask-Limiter with a recorded 60 requests/minute limit, API authentication
+and LiteLLM provider integration. The release used a one-second worker-thread
+regex timeout. That wrapper did not establish cancellable regex execution;
+the hardening branch replaces it with an engine timeout.

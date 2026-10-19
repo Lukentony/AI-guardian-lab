@@ -1,482 +1,437 @@
-from flask import Flask, request, jsonify
-import yaml
-import re
-import os
+"""Fail-closed command authorization. Models may narrow, never broaden policy."""
+
 import base64
-import time
-import sqlite3
+import hashlib
+import hmac
+import json
 import logging
+import os
+import re
+import sqlite3
 import threading
-import shlex
-from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+import uuid
+from pathlib import Path
+
+import regex
+from flask import Flask, jsonify, request
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-import intent
-from auth import check_auth
+from database.audit_logger import connect, database_path, init_db, log_command
+from database.audit_logger import mask_secrets as mask_secrets
+from guardian.guardian import intent
+from guardian.guardian.auth import check_auth
+from guardian.guardian.configuration import load_learned, load_policy, read_yaml, update_learned
+from guardian.guardian.forensics_routes import forensics_bp
+from guardian.guardian.shell_commands import UnsupportedShellError, parse_commands
+from guardian.guardian.shell_commands import extract_binaries as extract_binaries
+from guardian.guardian.system_one import load_config as load_system_one_config
+from guardian.guardian.system_one import observe
+from guardian.guardian.task_context import get_task, register_task
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
 logger = logging.getLogger("guardian")
-
 app = Flask(__name__)
-
-# SEC-02 (Refined): Use Flask-Limiter for standard rate limiting
+app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024
 limiter = Limiter(
     get_remote_address,
     app=app,
     default_limits=["1000 per day"],
-    storage_uri=os.environ.get("RATE_LIMIT_STORAGE_URI", "memory://"),
+    storage_uri=os.getenv("RATE_LIMIT_STORAGE_URI", "memory://"),
 )
-
-# Phase 5.5: Forensics API
-from forensics_routes import forensics_bp
 app.register_blueprint(forensics_bp)
 
-
-# SEC-04b / BUG-05: Protection against pool saturation
-MAX_CONCURRENT_VALIDATIONS = 10
-_validation_semaphore = threading.Semaphore(MAX_CONCURRENT_VALIDATIONS)
-
-
-API_KEY = os.getenv('API_KEY', '')
-DB_PATH = os.getenv('DB_PATH', "/app/database/audit.db")
-PATTERNS_PATH = os.getenv('PATTERNS_PATH', '/app/config/patterns.yaml')
-POLICY_PATH = os.getenv('POLICY_PATH', '/app/config/policy.yaml')
-# BUG-02: Write to a non-ro mount
-LEARNED_PATH = os.getenv('LEARNED_PATH', '/app/learned/learned_patterns.yaml')
-MAX_COMMAND_LENGTH = 1024 # SEC-04b
-
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    # Enable WAL mode for better concurrency (Phase 1 fix)
-    conn.execute('PRAGMA journal_mode=WAL')
-    # Create table if not exists (schema adapted from database/schema.sql)
-    conn.execute('''
-    CREATE TABLE IF NOT EXISTS command_log (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp TEXT NOT NULL,
-        task TEXT NOT NULL,
-        command TEXT NOT NULL,
-        status TEXT NOT NULL,
-        llm_provider TEXT,
-        guardian_reason TEXT
-    )
-    ''')
-    conn.execute('CREATE INDEX IF NOT EXISTS idx_timestamp ON command_log(timestamp)')
-    conn.execute('CREATE INDEX IF NOT EXISTS idx_status ON command_log(status)')
-    
-    # v1.2.0: Add intent_source column for intent coherence feature
-    try:
-        conn.execute('ALTER TABLE command_log ADD COLUMN intent_source TEXT DEFAULT NULL')
-    except sqlite3.OperationalError:
-        pass # Column likely already exists
-        
-    conn.commit()
-    conn.close()
-    logger.info("Database initialized with WAL mode enabled")
-
-# Initialize DB on startup
-db_dir = os.path.dirname(DB_PATH)
-if db_dir and not os.path.exists(db_dir):
-    os.makedirs(db_dir, exist_ok=True)
-init_db()
-
-def mask_secrets(text):
-    # Phase 2: Refined secret masking
-    secret_patterns = [
-        (r'(?i)(api[_-]?key|token|auth|password|secret|credential|private[_-]?key)["\s:=]+([A-Za-z0-9_-]{12,})', r'\1=***MASKED***'),
-        (r'(?i)(sk-[A-Za-z0-9]{20,})', r'sk-***MASKED***'),
-        (r'(?i)(gsk_[A-Za-z0-9]{20,})', r'gsk_***MASKED***'),
-        (r'(?i)(AIza[0-9A-Za-z-_]{35})', r'AIza***MASKED***'), # Google API Key
-        (r'(?i)(Bearer\s+)[A-Za-z0-9\-\._~\+\/]+=*', r'\1***MASKED***'),
-        (r'ghp_[A-Za-z0-9]{36}', r'ghp_***MASKED***'),                    # GitHub classic PAT
-        (r'github_pat_[A-Za-z0-9_]{82}', r'github_pat_***MASKED***'),     # GitHub fine-grained PAT
-        (r'\b[0-9a-f]{40}\b', r'***MASKED_HEX40***'),                     # SHA1-length hex tokens (e.g. Gitea)
-    ]
-    for pattern, replacement in secret_patterns:
-        text = re.sub(pattern, replacement, text)
-    return text
-
-def log_to_db(task, command, status, reason, provider, intent_source=None):
-    try:
-        # Mask secrets in command and task before logging
-        safe_command = mask_secrets(command)
-        safe_task = mask_secrets(task)
-        
-        # Add timeout to handle concurrent writes
-        conn = sqlite3.connect(DB_PATH, timeout=10.0)
-        conn.execute(
-            "INSERT INTO command_log (timestamp, task, command, status, llm_provider, guardian_reason, intent_source) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (datetime.utcnow().isoformat(), safe_task, safe_command, status, provider, reason, intent_source)
-        )
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        logger.error(f"Error logging to DB: {e}")
-
-# ReDoS-safe regex compilation and execution (SEC-04b / Phase 2)
+CONFIG_DIR = Path(__file__).resolve().parents[1] / "config"
+DB_PATH = database_path()
+POLICY_PATH = os.getenv("POLICY_PATH", str(CONFIG_DIR / "policy.yaml"))
+PATTERNS_PATH = os.getenv("PATTERNS_PATH", str(CONFIG_DIR / "patterns.yaml"))
+LEARNED_PATH = os.getenv("LEARNED_PATH", str(CONFIG_DIR.parent / "learned/learned_patterns.yaml"))
+MAX_COMMAND_LENGTH = 1024
+MAX_TASK_LENGTH = 4096
 MAX_PATTERN_LENGTH = 200
-REGEX_TIMEOUT = 1.0  # seconds
+REGEX_TIMEOUT = 0.05
+MAX_CONCURRENT_VALIDATIONS = 10
+_validation_semaphore = threading.BoundedSemaphore(MAX_CONCURRENT_VALIDATIONS)
 
-# BUG-05: Scale pool with CPU cores
-executor = ThreadPoolExecutor(max_workers=min(32, (os.cpu_count() or 1) * 4))
+
+class RegexEvaluationError(RuntimeError):
+    pass
+
+
+def safe_compile(pattern_str, source="static"):
+    if not isinstance(pattern_str, str) or not pattern_str or len(pattern_str) > MAX_PATTERN_LENGTH:
+        return None
+    try:
+        # Non-greedy quantifiers do NOT prevent ReDoS. Keep regex meaning intact
+        # and use an engine-enforced timeout instead of an uncancellable thread.
+        return regex.compile(pattern_str, regex.IGNORECASE)
+    except regex.error:
+        logger.warning("Invalid regex in category %s", source)
+        return None
+
 
 def regex_match_with_timeout(pattern, text):
-    """Run regex search with a timeout to prevent DoS."""
     try:
-        future = executor.submit(pattern.search, text)
-        return future.result(timeout=REGEX_TIMEOUT)
-    except TimeoutError:
-        logger.warning(f"Regex timeout after {REGEX_TIMEOUT}s on pattern: {pattern.pattern}")
-        return None
-    except Exception as e:
-        logger.error(f"Regex error: {e}")
-        return None
-
-# check_auth is now defined in auth.py and imported at the top of this file
+        compiled = (
+            pattern
+            if isinstance(pattern, regex.Pattern)
+            else regex.compile(pattern.pattern, pattern.flags)
+        )
+        return compiled.search(text, timeout=REGEX_TIMEOUT)
+    except (TimeoutError, regex.error) as exc:
+        raise RegexEvaluationError("Regex evaluation failed; execution denied") from exc
 
 
 def normalize_command(command):
-    normalized = command
-    
-    # 1. Normalize IFS variants (must come before general escape stripping)
-    normalized = re.sub(r'\$\{IFS\}', ' ', normalized)
-    normalized = re.sub(r"\$'\\[tn]'", ' ', normalized)
-    
-    # 2. Decode hex payloads: echo <hex> | xxd -r -p
-    hex_pattern = r'echo\s+([0-9a-fA-F]+)\s*\|\s*xxd\s+-r\s+-p'
-    match_hex = re.search(hex_pattern, normalized)
-    if match_hex:
-        try:
-            decoded = bytes.fromhex(match_hex.group(1)).decode('utf-8', errors='ignore')
-            normalized = normalized.replace(match_hex.group(0), decoded)
-        except Exception:
-            pass
+    """Heuristic inspection view only. Never parse/execute this altered string."""
+    normalized = re.sub(r"\$\{IFS\}", " ", command)
+    normalized = re.sub(r"\$'\\[tn]'", " ", normalized)
+    for pattern, decoder in [
+        (r"""echo\s+(['"]?)([0-9a-fA-F]+)\1\s*\|\s*xxd\s+-r\s+-p""", bytes.fromhex),
+        (r"""echo\s+(['"]?)([A-Za-z0-9+/=]+)\1\s*\|\s*base64\s+-d""", base64.b64decode),
+    ]:
+        match = re.search(pattern, normalized)
+        if match:
+            try:
+                normalized = normalized.replace(
+                    match.group(0), decoder(match.group(2)).decode("utf-8", errors="strict")
+                )
+            except (ValueError, UnicodeError):
+                pass  # The raw encoding operation is still checked by L2.
+    normalized = re.sub(r"\$\((.*?)\)", r"\1", normalized)
+    normalized = re.sub(r"`(.*?)`", r"\1", normalized)
+    normalized = re.sub(r"""['"]""", "", normalized)
+    normalized = re.sub(r"\\(.)", r"\1", normalized)
+    return re.sub(r"\s+", " ", normalized).strip()
 
-    # 3. Decode base64 payloads: echo <b64> | base64 -d
-    b64_pattern = r'echo\s+([A-Za-z0-9+/=]+)\s*\|\s*base64\s+-d'
-    match_b64 = re.search(b64_pattern, normalized)
-    if match_b64:
-        try:
-            decoded = base64.b64decode(match_b64.group(1)).decode('utf-8', errors='ignore')
-            normalized = normalized.replace(match_b64.group(0), decoded)
-        except Exception:
-            pass
 
-    # 4. Strip shell wrappers $() and ``
-    normalized = re.sub(r'\$\((.*?)\)', r'\1', normalized)
-    normalized = re.sub(r'`(.*?)`', r'\1', normalized)
+def compile_static_patterns(path):
+    document = read_yaml(path)
+    categories = document.get("patterns")
+    if not isinstance(categories, dict):
+        raise ValueError("patterns.yaml requires categories")
+    compiled_patterns = []
+    for category, entries in categories.items():
+        if not isinstance(entries, list):
+            raise ValueError("Pattern categories must contain lists")
+        for entry in entries:
+            compiled = safe_compile(
+                entry.get("pattern") if isinstance(entry, dict) else None, category
+            )
+            if compiled is None:
+                raise ValueError("Invalid static pattern; refusing partial protection")
+            compiled_patterns.append(
+                (compiled, category, category in {"subshell_execution", "encoding_bypass"})
+            )
+    if not compiled_patterns:
+        raise ValueError("Guardian cannot start without static patterns")
+    return compiled_patterns
 
-    # 5. Bash/Shell obfuscation: $'' or "" wrapping tokens
-    # e.g., c''a""t -> cat
-    normalized = re.sub(r"['\"]", '', normalized)
 
-    # 6. Strip escape characters (e.g., \l\s -> ls)
-    normalized = re.sub(r'\\(.)', r'\1', normalized)
-    
-    # 7. Collapse whitespace
-    normalized = re.sub(r'\s+', ' ', normalized)
+policy = load_policy(POLICY_PATH)
+patterns = compile_static_patterns(PATTERNS_PATH)
+system_one_config = load_system_one_config(
+    os.getenv("SYSTEM_ONE_CONFIG", str(CONFIG_DIR / "system_one.yaml"))
+)
+init_db(DB_PATH)
 
-    return normalized.strip()
 
-def safe_compile(pattern_str, source="static"):
-    """Compile a regex pattern with ReDoS safety checks."""
-    if len(pattern_str) > MAX_PATTERN_LENGTH:
-        logger.warning(f"Pattern too long ({len(pattern_str)} chars), skipping [{source}]: {pattern_str[:50]}...")
-        return None
-    # Block greedy .* which causes catastrophic backtracking
-    # Use re.sub with a lookahead to only replace .* that are NOT followed by ?
-    safe_str = re.sub(r'\.\*(?!\?)', '.*?', pattern_str)
-    # SEC-04b Remediation: also sanitize any invalid double non-greedy .*?? 
-    safe_str = safe_str.replace('.*??', '.*?')
-    
-    if safe_str != pattern_str:
-        logger.info(f"Replaced greedy .* with .*? in pattern [{source}]: {pattern_str}")
-        pattern_str = safe_str
+def validate_command(command, task=None, *, observer=None):
+    if not _validation_semaphore.acquire(blocking=False):
+        return False, "Blocked: Guardian under load", "system_load"
     try:
-        # Phase 1: Enable case-insensitivity to prevent 'SUDO' bypasses
-        return re.compile(pattern_str, re.IGNORECASE)
-    except re.error as e:
-        logger.warning(f"Invalid regex [{source}]: {pattern_str} — {e}")
-        return None
-
-# --- FAIL-SECURE configuration loading (SEC-03b / Phase 1 & 2) ---
-policy = {}
-try:
-    if os.path.exists(POLICY_PATH):
-        with open(POLICY_PATH, 'r') as f:
-            policy = yaml.safe_load(f)
-            logger.info(f"Policy loaded from {POLICY_PATH} (Mode: {policy.get('mode', 'unknown')})")
-except Exception as e:
-    logger.warning(f"Failed to load policy.yaml (non-fatal for Phase 1): {e}")
-
-# Store patterns as (compiled_regex, category_name) to harden audit logs (SEC-05b)
-patterns = []
-try:
-    if os.path.exists(PATTERNS_PATH):
-        with open(PATTERNS_PATH, 'r') as f:
-            config = yaml.safe_load(f)
-            if not config or 'patterns' not in config:
-                raise ValueError("patterns.yaml is empty or missing 'patterns' key")
-            pattern_dict = config.get('patterns', {})
-            for category, pattern_list in pattern_dict.items():
-                if isinstance(pattern_list, list):
-                    for p in pattern_list:
-                        if isinstance(p, dict) and 'pattern' in p:
-                            is_structural = category in ['subshell_execution', 'encoding_bypass']
-                            compiled = safe_compile(p['pattern'], source=category)
-                            if compiled:
-                                patterns.append((compiled, category, is_structural))
-except Exception as e:
-    logger.critical(f"CRITICAL: Failed to load patterns from {PATTERNS_PATH}: {e}")
-    # Fail-secure: stop the application if static patterns cannot be loaded
-    if not os.getenv('TESTING'):
-        raise RuntimeError(f"Guardian cannot start without patterns: {e}")
-
-if not patterns:
-    logger.critical("CRITICAL: Guardian loaded 0 patterns — refusing to start (fail-secure)")
-    raise RuntimeError("Guardian loaded 0 patterns")
-
-logger.info(f"Guardian initialized with {len(patterns)} patterns")
-
-# --- Learned patterns with validation (SEC-05b) ---
-if os.path.exists(LEARNED_PATH):
-    try:
-        with open(LEARNED_PATH, 'r') as f:
-            learned = yaml.safe_load(f)
-            if learned and 'learned_patterns' in learned:
-                loaded_count = 0
-                for p in learned['learned_patterns']:
-                    if isinstance(p, dict) and 'pattern' in p:
-                        compiled = safe_compile(p['pattern'], source="learned")
-                        if compiled:
-                            patterns.append((compiled, "learned_pattern", False))
-                            loaded_count += 1
-                logger.info(f"Loaded {loaded_count} learned patterns")
-    except Exception as e:
-        logger.warning(f"Failed to load learned patterns (non-fatal): {e}")
-
-
-def extract_binaries(command):
-    """BUG-04: Robustly extract all binaries from a command chain."""
-    # Use regex to insert spaces around all control and redirection operators.
-    # This handles attached operators like ls>/dev/null and numeric descriptors like 2>
-    pattern = r'(\s*(;|&&|\|\||\||[0-9]*>>|[0-9]*>\||[0-9]*>&|[0-9]*<&|[0-9]*&>|[0-9]*<<<|[0-9]*<<|[0-9]*<|[0-9]*>)\s*)'
-
-    def replacer(match):
-        return f" {match.group(2)} "
-
-    spaced_command = re.sub(pattern, replacer, command)
-    
-    try:
-        tokens = shlex.split(spaced_command)
-    except ValueError:
-        tokens = spaced_command.split()
-
-    separators = {';', '&&', '||', '|'}
-    redir_pattern = re.compile(r'^([0-9]*>>|[0-9]*>\||[0-9]*>&|[0-9]*<&|[0-9]*&>|[0-9]*<<<|[0-9]*<<|[0-9]*<|[0-9]*>)$')
-
-    binaries = []
-    take_next = True
-    
-    i = 0
-    while i < len(tokens):
-        token = tokens[i]
-
-        if token in separators:
-            take_next = True
-            i += 1
-            continue
-
-        if redir_pattern.match(token):
-            i += 2 # skip operator and the following file/heredoc marker
-            continue
-
-        if take_next:
-            if '=' in token and not token.startswith('-'):
-                # it's an assignment (e.g., FOO=bar command), keep looking for the binary
-                i += 1
-                continue
-
-            # Normalize path: ./rm -> rm
-            binaries.append(os.path.basename(token))
-            take_next = False
-
-        i += 1
-
-    return binaries
-
-def validate_command(command, task=None):
-    # BUG-05: Concurrency Guard
-    acquired = _validation_semaphore.acquire(blocking=False)
-    if not acquired:
-        logger.warning("Guardian under high load: rejecting validation request")
-        return False, "Blocked: Guardian system under load, retry later", "system_load"
-    
-    try:
-        # SEC-04b (Phase 2): Reject excessively long commands
+        if not isinstance(command, str) or not command.strip() or "\x00" in command:
+            return False, "Blocked: non-empty command string required", "input"
         if len(command) > MAX_COMMAND_LENGTH:
-            logger.warning(f"Command rejected: too long ({len(command)} chars)")
-            return False, f"Blocked: Command exceeds max length ({MAX_COMMAND_LENGTH} chars)", "policy"
-        
-        normalized = normalize_command(command)
-        
-        # Phase 3 Enforcement: Strict Binary Allowlisting (SEC-03b)
-        # BUG-04: Check ALL binaries in the command chain
-        binaries = extract_binaries(normalized)
-        if not binaries and normalized:
-             # Fallback if shlex/split yielded nothing but string is not empty
-             binaries = [normalized.split(' ')[0]]
-
-        zones = policy.get('zones', {})
-        green_binaries = zones.get('green', {}).get('binaries', [])
-        yellow_binaries = zones.get('yellow', {}).get('binaries', [])
-        red_binaries = zones.get('red', {}).get('binaries', [])
-        strict_mode = policy.get('mode', 'permissive') == 'enforced'
-
-        for binary in binaries:
-            if binary in red_binaries:
-                return False, f"Blocked: Binary '{binary}' is in the RED zone (forbidden)", "allowlist"
-            
-            is_allowlisted = (binary in green_binaries) or (binary in yellow_binaries)
-            if strict_mode and not is_allowlisted:
-                return False, f"Blocked: Binary '{binary}' is not in the allowlist (Fail-Closed)", "allowlist"
-        
-        # Phase 1 Remediation: Dual-Path Validation
-        # We check both the raw command and the normalized version to prevent bypasses
-        # that might occur if normalization strips malicious tokens (like $(...) wrappers).
-        # Dual-Path Validation with Structural Awareness
-        # Patterns like subshell detection must check the RAW command before normalization
-        # potentially strips the wrappers.
-        for pattern, category, is_structural in patterns:
-            clean_category = category.replace('_', ' ').title()
-            
-            # 1. Always check the RAW command
-            if regex_match_with_timeout(pattern, command):
-                return False, f"Blocked (Security Policy) - Category: {clean_category}", "regex"
-            
-            # 2. Check NORMALIZED command only for non-structural patterns
-            # (Normalization intentionally strips structural shells, so checking them 
-            # against normalized text is redundant or 'dead code').
-            if not is_structural:
-                if regex_match_with_timeout(pattern, normalized):
-                    return False, f"Blocked (Heuristic) - Category: {clean_category}", "regex"
-                
-        # Phase 3: Intent Coherence (v1.2.0 Layer 3 + 4)
-        intent_res = intent.check_intent_mapping(normalized, task)
-        if intent_res["blocked"]:
-            return False, intent_res["reason"], intent_res["intent_source"]
-            
-        if intent_res.get("needs_llm"):
-            llm_res = intent.check_intent_llm(normalized, task)
-            if llm_res["blocked"]:
-                return False, llm_res["reason"], llm_res["intent_source"]
-            return True, llm_res["reason"], llm_res["intent_source"]
-            
-        return True, "Approved", intent_res.get("intent_source", "mapping")
+            return False, f"Blocked: command exceeds max length ({MAX_COMMAND_LENGTH})", "input"
+        if not isinstance(task, str) or not task.strip() or len(task) > MAX_TASK_LENGTH:
+            return False, "Blocked: explicit bounded task string required", "input"
+        try:
+            commands = parse_commands(command)
+        except UnsupportedShellError:
+            return False, "Blocked: unsupported or malformed shell syntax", "shell"
+        zones = policy["zones"]
+        permitted = set(zones["green"]["binaries"]) | set(zones["yellow"]["binaries"])
+        for part in commands:
+            if (
+                not part.trusted_executable
+                or part.binary not in permitted
+                or part.binary in zones["red"]["binaries"]
+            ):
+                return False, "Blocked: executable is not authorized by policy", "allowlist"
+        try:
+            learned = []
+            for item in load_learned(LEARNED_PATH)["learned_patterns"]:
+                compiled = safe_compile(item["pattern"], "learned")
+                if compiled is None:
+                    raise ValueError("Invalid persisted learned pattern")
+                learned.append((compiled, "learned_pattern", False))
+            normalized = normalize_command(command)
+            # Dual-path structural awareness: always inspect the exact raw input;
+            # normalization is only an additional non-authoritative detection view.
+            for pattern, category, structural in [*patterns, *learned]:
+                if regex_match_with_timeout(pattern, command) or (
+                    not structural and regex_match_with_timeout(pattern, normalized)
+                ):
+                    return False, f"Blocked: security pattern ({category})", "regex"
+        except (RegexEvaluationError, ValueError, OSError):
+            return False, "Blocked: pattern protection unavailable", "regex_error"
+        mapping = intent.check_intent_mapping(command, task)
+        if mapping["blocked"]:
+            return False, mapping["reason"], mapping["intent_source"]
+        if observer is not None:
+            # Observation has no authority: its returned value is never consulted.
+            observer()
+        if mapping["needs_llm"]:
+            semantic = intent.check_intent_llm(command, task)
+            return not semantic["blocked"], semantic["reason"], semantic["intent_source"]
+        return True, "Approved", "mapping"
     finally:
         _validation_semaphore.release()
 
-@app.route('/health', methods=['GET'])
+
+@app.get("/health")
 def health():
-    # BUG-06: Information Disclosure hardening
     return jsonify({"status": "healthy"}), 200
 
-@app.route('/validate', methods=['POST'])
+
+@app.post("/validate")
 @limiter.limit("60 per minute")
 def validate():
     if not check_auth():
         return jsonify({"error": "Unauthorized"}), 401
-    
-    # Robust JSON validation (Phase 1 fix)
     data = request.get_json(silent=True)
-    if data is None:
-        return jsonify({"error": "Invalid JSON or missing Content-Type"}), 400
-        
-    command = data.get('command', '')
-    task = data.get('task', 'Unknown Task')
-    provider = data.get('llm_provider', 'unknown')
-    
-    approved, reason, intent_source = validate_command(command, task)
-    
-    # Log the result
-    status = 'executed' if approved else 'rejected'
-    log_to_db(task, command, status, reason, provider, intent_source)
-    
-    return jsonify({"approved": approved, "reason": reason, "intent_source": intent_source}), 200
+    if not isinstance(data, dict):
+        return jsonify({"error": "JSON object required"}), 400
+    command, task = data.get("command"), data.get("task")
+    task_id = data.get("task_id")
+    if task_id is not None:
+        try:
+            context = get_task(task_id, DB_PATH)
+            if context["policy_version"] != policy["version"]:
+                raise ValueError("Policy changed; task must be registered again")
+        except ValueError:
+            return jsonify(
+                {"approved": False, "error": "Invalid, expired or stale task context"}
+            ), 409
+        if task is not None and task != context["task"]:
+            return jsonify(
+                {"approved": False, "error": "Task differs from registered context"}
+            ), 409
+        task = context["task"]
+    else:
+        context = {"task": task, "trust": "caller_supplied", "policy_version": policy["version"]}
+    untrusted_output = data.get("untrusted_tool_output", "")
+    if not isinstance(untrusted_output, str) or len(untrusted_output) > 8192:
+        return jsonify({"error": "Invalid untrusted observation"}), 400
+    if not isinstance(command, str) or not isinstance(task, str):
+        return jsonify({"error": "command and task must be strings"}), 400
+    provider = data.get("llm_provider", "unknown")
+    if not isinstance(provider, str) or len(provider) > 100:
+        return jsonify({"error": "Invalid provider"}), 400
+    observation = {
+        "mode": system_one_config.mode,
+        "status": "not_run_baseline_rejected",
+        "decision_unchanged": True,
+    }
 
-@app.route('/report', methods=['POST'])
+    def observer():
+        history = []
+        if task_id:
+            connection = connect(DB_PATH)
+            try:
+                rows = connection.execute(
+                    "SELECT command,status FROM command_log WHERE json_extract(metadata,'$.task_id')=? ORDER BY id DESC LIMIT 5",
+                    (task_id,),
+                ).fetchall()
+                history = [dict(row) for row in reversed(rows)]
+            finally:
+                connection.close()
+        observation.update(
+            observe(
+                system_one_config,
+                command,
+                context,
+                history=history,
+                untrusted_output=untrusted_output,
+            )
+        )
+
+    approved, reason, source = validate_command(command, task, observer=observer)
+    validation_id = str(uuid.uuid4())
+    try:
+        # Approval is NOT execution. If audit fails, do not issue authorization.
+        log_command(
+            task,
+            command,
+            "approved" if approved else "rejected",
+            provider,
+            reason,
+            intent_source=source,
+            validation_id=validation_id,
+            path=DB_PATH,
+            metadata={
+                "task_id": task_id,
+                "policy_version": policy["version"],
+                "system_one": observation,
+            },
+        )
+    except Exception:
+        logger.error("Audit append failed; authorization withheld")
+        return jsonify({"approved": False, "error": "Audit unavailable"}), 503
+    return jsonify(
+        {
+            "approved": approved,
+            "reason": reason,
+            "intent_source": source,
+            "validation_id": validation_id,
+            "system_one": observation,
+        }
+    ), 200
+
+
+def operator_authenticated():
+    key = os.getenv("TASK_API_KEY", "")
+    return bool(
+        key
+        and key not in {"CHANGE_ME", os.getenv("API_KEY", "")}
+        and hmac.compare_digest(request.headers.get("X-Task-Key", "").encode(), key.encode())
+    )
+
+
+@app.post("/tasks")
+@limiter.limit("10 per minute")
+def create_task():
+    if not check_auth() or not operator_authenticated():
+        return jsonify({"error": "Operator authorization required"}), 403
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "JSON object required"}), 400
+    try:
+        context = register_task(data, policy["version"], DB_PATH)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(context), 201
+
+
+@app.get("/tasks/<task_id>")
+def read_task(task_id):
+    if not check_auth():
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        context = get_task(task_id, DB_PATH)
+    except ValueError:
+        return jsonify({"error": "Invalid or expired task"}), 404
+    return jsonify(context), 200
+
+
+@app.get("/audit")
+@limiter.limit("30 per minute")
+def audit_view():
+    if not check_auth():
+        return jsonify({"error": "Unauthorized"}), 401
+    connection = None
+    try:
+        connection = connect(DB_PATH)
+        total = connection.execute(
+            "SELECT COUNT(*) FROM command_log WHERE status IN ('approved','rejected') OR validation_id IS NULL"
+        ).fetchone()[0]
+        executed = connection.execute(
+            "SELECT COUNT(*) FROM command_log WHERE status='executed'"
+        ).fetchone()[0]
+        rejected = connection.execute(
+            "SELECT COUNT(*) FROM command_log WHERE status='rejected'"
+        ).fetchone()[0]
+        rows = connection.execute(
+            "SELECT timestamp,task,command,status,llm_provider,guardian_reason FROM command_log ORDER BY id DESC LIMIT 20"
+        ).fetchall()
+    except sqlite3.Error:
+        return jsonify({"error": "Audit unavailable"}), 503
+    finally:
+        if connection is not None:
+            connection.close()
+    return jsonify(
+        {
+            "stats": {"total": total, "executed": executed, "rejected": rejected},
+            "commands": [dict(row) for row in rows],
+        }
+    ), 200
+
+
+@app.post("/report")
 @limiter.limit("60 per minute")
 def report():
     if not check_auth():
         return jsonify({"error": "Unauthorized"}), 401
-    
     data = request.get_json(silent=True)
-    if data is None:
-        return jsonify({"error": "Invalid JSON"}), 400
-
-    # Phase 1 Fix: Actually log the report to DB
-    task = data.get('task', 'Reported Task')
-    command = data.get('command', 'N/A')
-    status = data.get('status', 'reported')
-    reason = data.get('reason', 'External Report')
-    provider = data.get('llm_provider', 'unknown')
-    
-    log_to_db(task, command, status, reason, provider, intent_source='report')
-    
+    if not isinstance(data, dict):
+        return jsonify({"error": "JSON object required"}), 400
+    validation_id, command, status = (
+        data.get("validation_id"),
+        data.get("command"),
+        data.get("status"),
+    )
+    if (
+        not isinstance(validation_id, str)
+        or len(validation_id) > 64
+        or not isinstance(command, str)
+        or len(command) > MAX_COMMAND_LENGTH
+        or not isinstance(status, str)
+        or status not in {"executed", "simulated", "execution_error"}
+    ):
+        return jsonify(
+            {"error": "Bounded validation_id, command and terminal status required"}
+        ), 400
+    connection = connect(DB_PATH)
+    try:
+        decision = connection.execute(
+            "SELECT * FROM command_log WHERE validation_id=? AND status='approved'",
+            (validation_id,),
+        ).fetchone()
+        previous = connection.execute(
+            "SELECT status FROM command_log WHERE validation_id=? AND status IN ('executed','simulated','execution_error')",
+            (validation_id,),
+        ).fetchone()
+    finally:
+        connection.close()
+    if not decision or hashlib.sha256(command.encode()).hexdigest() != decision["command_hash"]:
+        return jsonify({"error": "No matching approved validation"}), 409
+    if previous:
+        return jsonify({"status": "logged"}), 200 if previous["status"] == status else 409
+    try:
+        log_command(
+            decision["task"],
+            command,
+            status,
+            decision["llm_provider"],
+            "Authenticated agent outcome",
+            int(status == "simulated"),
+            intent_source="report",
+            validation_id=validation_id,
+            path=DB_PATH,
+            metadata={"task_id": json.loads(decision["metadata"]).get("task_id")},
+        )
+    except sqlite3.IntegrityError:
+        return jsonify({"error": "Outcome already recorded; inspect existing result"}), 409
+    except Exception:
+        return jsonify({"error": "Audit unavailable"}), 503
     return jsonify({"status": "logged"}), 200
 
-@app.route('/learn', methods=['POST'])
+
+@app.post("/learn")
 @limiter.limit("10 per minute")
 def learn():
-    """Authenticated endpoint to add new patterns to learned_patterns.yaml."""
-    if not check_auth():
-        return jsonify({"error": "Unauthorized"}), 401
-        
+    if not check_auth() or not operator_authenticated():
+        return jsonify({"error": "Operator authorization required"}), 403
     data = request.get_json(silent=True)
-    if not data or 'pattern' not in data:
-        return jsonify({"error": "Missing 'pattern' in request body"}), 400
-        
-    new_pattern_str = data['pattern']
-    description = data.get('description', 'Dynamically learned pattern')
-    
-    # 1. Validate the regex
-    compiled = safe_compile(new_pattern_str, source="dynamic_learn")
-    if not compiled:
-        return jsonify({"error": "Invalid or unsafe regex pattern"}), 400
-        
-    # 2. Add to in-memory patterns
-    # BUG-01: Fix tuple unpacking (add is_structural=False)
-    patterns.append((compiled, "learned_pattern", False))
-    
-    # 3. Persist to file
+    if not isinstance(data, dict) or safe_compile(data.get("pattern"), "reviewed") is None:
+        return jsonify({"error": "Valid bounded pattern required"}), 400
+    description = data.get("description", "Explicitly reviewed pattern")
+    if not isinstance(description, str) or len(description) > 300:
+        return jsonify({"error": "Invalid description"}), 400
     try:
-        learned_data = {'learned_patterns': []}
-        if os.path.exists(LEARNED_PATH):
-            with open(LEARNED_PATH, 'r') as f:
-                learned_data = yaml.safe_load(f) or {'learned_patterns': []}
-        
-        learned_data['learned_patterns'].append({
-            'pattern': new_pattern_str,
-            'description': description,
-            'added_at': datetime.utcnow().isoformat()
-        })
-        
-        with open(LEARNED_PATH, 'w') as f:
-            yaml.dump(learned_data, f)
-            
-        logger.info(f"Successfully learned and persisted new pattern: {new_pattern_str}")
-        return jsonify({"status": "learned", "pattern": new_pattern_str}), 201
-        
-    except Exception as e:
-        logger.error(f"Failed to persist learned pattern: {e}")
-        return jsonify({"error": "Pattern learned in memory but persistence failed"}), 500
-
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+        update_learned(
+            LEARNED_PATH, approved={"pattern": data["pattern"], "description": description}
+        )
+    except (OSError, ValueError):
+        return jsonify({"error": "Pattern not persisted; no in-memory change made"}), 503
+    return jsonify({"status": "learned"}), 201

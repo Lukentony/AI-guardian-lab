@@ -1,263 +1,110 @@
 # AI Guardian Lab
 
-![Status](https://img.shields.io/badge/status-experimental-orange)
-![Version](https://img.shields.io/badge/version-1.2.0-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-![CI](https://github.com/Lukentony/AI-guardian-lab/actions/workflows/ci.yml/badge.svg)
-![Benchmark](https://img.shields.io/badge/benchmark-synthetic--dataset-yellow)
+AI Guardian Lab checks shell commands before a cooperating AI agent runs them.
+The agent proposes a command; Guardian checks it against policy and the task.
+The agent then simulates the action or, when explicitly enabled, executes it.
 
-> **Warning — Demo/Research Only:** The agent executes LLM-generated shell commands directly
-> inside a Docker container via `/bin/bash -c`. No additional sandboxing is in place.
-> Do NOT use in production without a proper sandbox layer (gVisor, Firejail, nsjail,
-> or ephemeral VM per command).
+Created and maintained by [Luca Rivoiro](https://github.com/Lukentony).
 
-AI agents can run shell commands on your machine. Guardian decides which ones actually run.
+> **Research software.** Real execution is disabled by default. Enabling it runs
+> `/bin/bash -c` without a complete OS-level sandbox. Do not give the executor
+> sensitive workspaces or untrusted workloads on the assumption Docker is enough.
 
-AI agent frameworks often provide LLMs with direct shell access to complete tasks. In most implementations, security relies entirely on the model's willingness to follow system instructions. But model compliance is not the same thing as security enforcement.
+## Command checks
 
-## Quick Start 🚀
+The parser first rejects unsupported shell syntax. It inspects every command in
+a chain and accounts for redirections. An executable such as `/tmp/ls` cannot
+pass by sharing the name of an allowed system binary.
 
-Experience the protection in 60 seconds:
+Guardian then applies four checks:
 
-1. **Deploy:** `docker-compose up -d`
-2. **Attack:** `./demo.sh`
+- **L1, allowlist:** reject executables outside the configured policy.
+- **L2, patterns:** inspect raw and normalized text. A regex timeout or invalid
+  pattern denies validation rather than silently dropping the check.
+- **L3, intent:** compare the command's effects with the task, including network
+  operations and writes through redirection.
+- **L4, semantic review:** ask a model when the mapping needs review. Missing,
+  malformed, negative or uncertain replies deny execution.
 
-Watch as Guardian intercepts obfuscated payloads and intent-conflicting commands in real-time.
-
----
-
-## Defense Pipeline 🛡️
-
-Guardian implements a deterministic, multi-layered security middleware. It does **not** rely solely on LLM "good behavior."
-
-### L1 — Binary Allowlist
-Strict enforcement of permitted binaries. If it's not in the allowlist (e.g., `nc`, `nmap`), it's blocked before any LLM is even called.
-
-### L2 — Regex Engine
-Detects obfuscation techniques (base64 decoding in shell), dangerous flags (`--no-preserve-root`), and known exploit patterns.
-
-### L3 — Intent Coherence
-Cross-references the high-level **Task Intent** (what the user asked) with the **Command Action** (what the code does).
-*   *Task:* "List files" → *Command:* `rm -rf /` = **BLOCKED** (Intent conflict).
-
-### L4 — LLM Semantic Check
-Deep semantic analysis of complex or ambiguous commands. Uses a **Fail-Closed** logic: if the LLM is unavailable or the response is malformed, the command is blocked.
-
-### Forensic Integrity
-Audit logs are protected by **Chain Hashing** (SHA-256). Each log entry is cryptographically linked to the previous one, ensuring the "Chain of Custody" and making log tampering detectable.
-
----
-
-## Why this exists
-
-The AI ecosystem has an enforcement gap. While we have tools to monitor inputs and outputs, no major agent framework ships with native, pre-tool execution control. Prompt engineering is often used as a defense, but it is a suggestion, not a secure boundary. Guardian solves this by providing a deterministic intermediate layer that removes final decision-making power from the LLM for system-level actions.
-
-## How it works
-
-Guardian operates a 4-layer validation pipeline. It is "Fail-Closed" by design: if a layer has a doubt, the command is blocked.
+A model cannot reverse a deterministic rejection. The System One observer runs
+in shadow mode after the deterministic checks and cannot change the decision.
 
 ```mermaid
 flowchart LR
-    A([🤖 Agent Request]) --> L1
-
-    subgraph L1 [L1 — Binary Allowlist]
-        B{Executable\nallowed?}
-    end
-
-    subgraph L2 [L2 — Regex Engine]
-        C{Obfuscation /\ndangerous pattern?}
-    end
-
-    subgraph L3 [L3 — Intent Coherence]
-        D{Command matches\nuser task intent?}
-    end
-
-    subgraph L4 [L4 — LLM Semantic Check]
-        E{Ambiguous\ncases only}
-    end
-
-    L1 -->|pass| L2
-    L2 -->|pass| L3
-    L3 -->|pass| L4
-    L4 -->|pass| X([✅ EXECUTE])
-
-    B -->|block| R1([🚫 BLOCKED])
-    C -->|block| R2([🚫 BLOCKED])
-    D -->|block| R3([🚫 BLOCKED])
-    E -->|block| R4([🚫 BLOCKED])
-
-    style L1 fill:#1a1a2e,stroke:#4a90d9,color:#fff
-    style L2 fill:#1a1a2e,stroke:#e74c3c,color:#fff
-    style L3 fill:#1a1a2e,stroke:#f39c12,color:#fff
-    style L4 fill:#1a1a2e,stroke:#2ecc71,color:#fff
-    style X fill:#2ecc71,color:#000
-    style R1 fill:#e74c3c,color:#fff
-    style R2 fill:#e74c3c,color:#fff
-    style R3 fill:#e74c3c,color:#fff
-    style R4 fill:#e74c3c,color:#fff
+    A[Authenticated request] --> P[Restricted shell parser]
+    P --> L1[Allowlist]
+    L1 --> L2[Patterns and timeouts]
+    L2 --> L3[Complete intent mapping]
+    L3 --> S[Optional shadow observation]
+    S --> L4[Required semantic review]
+    L4 --> D[Signed authorization decision]
+    D --> X[Default simulation or opted-in executor]
+    X --> O[Separate terminal outcome]
 ```
 
-1.  **L1: Binary Allowlist**: Immediate filter based on risk zones (green, yellow, red). If a binary is not explicitly permitted in the current context, the execution dies here.
-2.  **L2: Regex Pattern Matching**: A dual-path ReDoS-safe engine that checks both the raw and normalized command against patterns of obfuscation, exfiltration, and destruction.
-3.  **L3: Intent Coherence Mapping**: This is the differentiator. It maps both the `task` field and the command to one of four intent families — `read`, `write`, `delete`, `network` — using a static keyword taxonomy, then checks for conflicts. The taxonomy is intentionally minimal to keep deterministic rules auditable and predictable.
+A rejection goes straight to the audit decision. Approval is recorded separately
+from execution: the executor reports a terminal outcome bound to the validation
+identity and command digest. A lost report does not trigger an execution retry.
 
-    | Task intent | Command intent | Result  |
-    |-------------|----------------|---------|
-    | read        | delete         | BLOCKED |
-    | read        | network        | BLOCKED |
-    | write       | delete         | BLOCKED |
-    | write       | read           | ALLOWED |
-    | delete      | delete         | ALLOWED |
+## System One status
 
-    Example: `task="analyze disk usage"` + `command="rm -rf /tmp"` → task maps to `read`, command maps to `delete` → **BLOCKED**.
+The typed observer asks whether a command fits the task, transfers data without
+authorization, follows untrusted instructions or lacks enough context. It uses
+signed operator-owned task context when available. Agent-supplied text does not
+become authorization. Inference must use a local or private endpoint; there is
+no hosted fallback.
 
-4.  **L4: LLM Semantic Check**: The LLM is the last resort. It is consulted only for ambiguous cases that deterministic layers cannot resolve, adding a final level of semantic understanding.
+The bundled CPU candidate uses upstream Kev and `jaredpalmer/kev-0.8b@v1.0`.
+Its eight calibration cases took about three seconds each and all missed the
+500 ms budget. A smoke test also gave harmless `ls` a misleading high-risk score.
+Kev's PyTorch constraint conflicts with security updates, so its service is now
+**quarantined before installation or startup**. No enforcement threshold was set.
+See [System One](docs/SYSTEM_ONE.md) for the measurements and replacement criteria.
 
-## Why determinism first
+## Running the lab
 
-I prioritized deterministic checks over LLM-based validation for three reasons:
-- **Transparency**: You can audit the regex and the mappings. You know exactly why a command was blocked.
-- **Speed**: Deterministic checks take milliseconds and require zero tokens.
-- **Reliability**: Logic does not "hallucinate". It offers a rigid boundary that no prompt injection can jump.
+Use [Install](docs/INSTALL.md) on the host chosen for the lab, from a dedicated
+terminal at the repository root. The installer creates distinct credentials on
+first installation and preserves an existing `.env`.
 
-**On L4:** The LLM layer is not a fallback for cases the deterministic layers "couldn't handle" — it is a deliberate scope boundary. L1–L3 cover the known attack surface: known-bad binaries, known patterns, and intent conflicts with a clear mapping. L4 handles the residual: commands that are structurally valid, not matched by any pattern, and whose task-command relationship is ambiguous by design. In practice, L4 fires on fewer than 5% of requests. The LLM cannot override a block issued by L1–L3. The enforcement hierarchy is strictly one-directional.
+Default host ports are loopback-only: Guardian 5000, Agent 5001 and UI 8081.
+The UI requires Basic authentication and reads audit data through Guardian,
+without a SQLite mount. The installer does not start the optional model service.
 
-## Benchmark
+The [authenticated dry-run example](docs/API.md#authenticated-dry-run-example)
+validates a command without executing it. Real execution also requires a
+registered task and matching workspace.
 
-Evaluated on a synthetic dataset of 100 labeled commands (50 benign, 50 malicious), designed to cover the known attack surface of the current policy configuration.
+## Audit and forensics
 
-| Metric          | Score                  |
-|-----------------|------------------------|
-| Precision       | 100% (synthetic set)   |
-| Recall          | 100% (synthetic set)   |
-| False Positives | 0                      |
-| False Negatives | 0                      |
+Audit records use a transactional HMAC-SHA256 chain with one schema and logger.
+Legacy unsigned rows remain unverifiable. A trusted external checkpoint is needed
+to detect deletion of a valid suffix or full database rollback. Signing cannot
+protect a compromised host or stolen key.
 
-Dataset and test suite: [`tests/`](tests/)
+The forensic API reads OpenHands and SWE-agent logs, retaining tool arguments for
+annotation. It looks for escalation, intent drift and prompt-injection signals
+after a session. Pattern mining produces suggestions; an operator must approve
+them before they become policy.
 
-> **Note:** These results are measured on a purpose-built synthetic dataset that covers the current policy's known attack surface. Real-world performance will vary depending on policy configuration, command patterns, and obfuscation techniques not present in the dataset. Do not interpret these numbers as a claim of perfect detection in production.
+## Checks and remaining work
 
-## How Guardian compares
+[Verification](docs/VERIFICATION.md) records the passing tests and dependency
+audit, the failed CPU experiment and the Docker checks still to run. Synthetic
+fixtures cover regressions; they do not measure real-world detection accuracy.
 
-| Feature                        | AI Guardian Lab | LLM Guard | Guardrails AI |
-|-------------------------------|-----------------|-----------|---------------|
-| Deterministic enforcement      | ✅              | Partial   | ❌            |
-| Intent coherence check         | ✅              | ❌        | ❌            |
-| Framework-agnostic (REST API)  | ✅              | ❌        | Partial       |
-| Fail-closed by default         | ✅              | ❌        | ❌            |
-| LLM as last resort only        | ✅              | ❌        | ❌            |
-| Audit log                      | ✅              | Partial   | Partial       |
-
-Comparison based on public documentation as of March 2026. LLM Guard and Guardrails AI are input/output scanners, not command-level enforcement layers — different design goals with some overlap. This table focuses exclusively on command-level enforcement capabilities.
-
-## The integration wall
-
-Agent frameworks block calls to private IPs by design for SSRF protection. This is an intentional and correct choice, but it has a heavy side effect: Guardian's enforcement today depends on model compliance (which must be instructed to call the middleware) rather than a native hard hook in the framework. This is an open problem for the entire ecosystem: true, unbreakable automatic enforcement will only arrive when frameworks implement native pre-tool hooks.
-
-## Forensics: Post-session Analysis
-
-Guardian also ships a post-mortem analysis module. While the validation pipeline intercepts commands in real time, the forensics module analyzes completed agent sessions to detect behavioral anomalies after the fact.
-
-It works with any agent framework that produces structured logs — not just Guardian-instrumented agents.
-
-**What it detects:**
-- **Tool escalation** — sessions where risk progresses from safe to dangerous commands
-- **Intent drift** — actions that diverge from the stated task
-- **Prompt injection signals** — tool outputs containing embedded instructions
-
-**Try it:**
-```bash
-bash scripts/demo_forensics.sh
-```
-
-**API:**
-```bash
-curl -s -X POST http://localhost:5000/forensics/analyze \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your-api-key" \
-  -d '{"jsonl": "{\"role\": \"user\", \"content\": \"list files\"}\n..."}'
-```
-
-The response includes an anomaly score (0–100), per-flag analysis with confidence levels, and a human-readable summary.
-
-## Quick Start
-
-#### 1. Installation
-```bash
-git clone https://github.com/Lukentony/AI-guardian-lab.git
-cd ai-guardian-lab
-./install.sh
-```
-
-#### 2. Start
-```bash
-docker-compose up -d
-```
-
-### 3. Try it
-
-```bash
-# Block a dangerous command
-curl -s -X POST http://localhost:5000/validate \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your-api-key" \
-  -d '{"command": "rm -rf /tmp", "task": "analyze disk usage"}'
-```
-
-```json
-{
-  "approved": false,
-  "layer": "L3",
-  "reason": "Intent conflict: task maps to 'read', command maps to 'delete'.",
-  "command": "rm -rf /tmp",
-  "task": "analyze disk usage"
-}
-```
-
-```bash
-# Allow a safe command
-curl -s -X POST http://localhost:5000/validate \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your-api-key" \
-  -d '{"command": "df -h", "task": "analyze disk usage"}'
-```
-
-```json
-{
-  "approved": true,
-  "layer": null,
-  "reason": null,
-  "command": "df -h",
-  "task": "analyze disk usage"
-}
-```
-
-## Use cases
-
-- **Local Testing**: Developers testing AI agents locally who want to understand what they are trying to do before giving total access.
-- **Audit & Compliance**: Those who need immutable logs of every single command attempted by an agent, including rejections.
-- **Hard Chokepoint**: Those who want a real filter between the LLM and the shell without hoping the model "behaves well" by following system instructions.
-
-## Threat Model & Limits
-
-**Attacker model:** Guardian assumes an adversary who:
-- Injects malicious instructions through user-controlled input fields (prompt injection)
-- Obfuscates commands to evade pattern matching (encoding, variable expansion, chaining)
-- Attempts to exploit the gap between a task description and the actual command executed
-- Controls the LLM's output but cannot directly modify Guardian's configuration or policy files
-
-Guardian is a shield, not a miracle:
-1.  **Regex limitations**: Extremely sophisticated obfuscations could theoretically evade static patterns.
-2.  **Normalization**: The variety of shell syntax is a constant battleground; some edge cases may require updates to the normalization rules.
-3.  **Sandbox Dependency**: Guardian blocks commands, but final security also depends on the environment isolation (sandbox/docker) where the agent runs.
+Every executor needs a pre-execution hook. Asking a model to call Guardian is not
+enforcement. The task policy is not a complete filesystem or network sandbox,
+and outcome reporting assumes an honest executor. Durable exactly-once execution
+and production deployment remain outside the current implementation.
 
 ## Documentation
-- [Architecture & Layers](docs/ARCHITECTURE.md)
-- [Database Integration & Maintenance](docs/DATABASE.md)
-- [Contributing](docs/CONTRIBUTING.md)
-- [Security Policy](docs/SECURITY.md)
 
----
+[Architecture](ARCHITETTURA.md) describes the components and trust boundaries.
+Use [Configuration](docs/CONFIGURATION.md) and [API](docs/API.md) for setup and
+integration. Read [Security](docs/SECURITY.md) before reporting a vulnerability.
 
-## 📄 License
-MIT License. See [LICENSE](LICENSE) for details.
+## License
+
+Project code is [MIT licensed](LICENSE). Dependencies retain their own licenses;
+upstream Kev is Apache-2.0. SecJev has not been adopted.

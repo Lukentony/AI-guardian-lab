@@ -1,118 +1,57 @@
-# AI Guardian Lab - Database Integration & Maintenance Guide
+# Audit database
 
-This document describes the structure of the auditing database, how to directly query and modify its contents, and how to expose it to other external AI agents or services.
+The audit database records authorization decisions and executor reports. It is
+not an approval queue: changing a row does not authorize a command, and editing
+signed records breaks verification.
 
----
+## Schema and storage
 
-## 📊 Database Overview
+`database/schema.sql` is the schema source. `database/audit_logger.py` handles
+migration, transactional appends and verification. The main table is
+`command_log`; task context is stored separately in `task_registry`.
 
-AI Guardian Lab logs all validation results to a SQLite database (`audit.db`).
-By default, the database is mounted on the host machine in the `./database` folder. Inside the `guardian` and `ui` containers, it is accessed at `/app/database/audit.db`.
+The Compose database lives at `state/audit/audit.db` on the host and
+`/var/lib/guardian/audit.db` inside Guardian. SQLite WAL sidecars belong alongside
+it. The UI has no database mount.
 
-### Database Schema
+A validation records `approved` or `rejected`. An approved validation can later
+have one terminal outcome: `simulated`, `executed` or `execution_error`. The
+validation identity and command digest bind that report to the original decision.
+Approval alone does not mean anything ran.
 
-The primary table is `command_log`.
+## Reading records
 
-```sql
-CREATE TABLE IF NOT EXISTS command_log (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp TEXT NOT NULL,          -- ISO 8601 UTC timestamp
-    task TEXT NOT NULL,               -- The described task intent (Layer 3/4 input)
-    command TEXT NOT NULL,            -- The actual executed shell command
-    status TEXT NOT NULL,             -- "approved" or "denied"
-    llm_provider TEXT,                -- LLM provider used (e.g. ollama, openai, groq)
-    guardian_reason TEXT,             -- Rejection explanation or approval context
-    intent_source TEXT DEFAULT NULL   -- Validation layer: "mapping", "llm", "skip", etc.
-);
+Use the authenticated [GET /audit API](API.md#get-audit) for the latest records
+and counts. It returns at most 20 rows and keeps database access in Guardian.
+Do not distribute the operator credential to readers.
 
-CREATE INDEX IF NOT EXISTS idx_timestamp ON command_log(timestamp);
-CREATE INDEX IF NOT EXISTS idx_status ON command_log(status);
-```
+Direct inspection should use a consistent backup in an authorized maintenance
+process. A read-only mount of a live WAL database can fail when its sidecars are
+unavailable; it is not a substitute for the API or a proper snapshot.
 
----
+Do not copy old instructions that manually approved rows, deleted signed history
+or shared the live database with agents. Those operations can invalidate the
+chain and bypass the intended separation between clients and persisted state.
 
-## 🛠️ Direct Database Modification
+## Integrity and migration
 
-Since SQLite is a local file-based database, you can manipulate it directly from either the host machine or from inside the Docker container.
+New records use HMAC-SHA256 over their canonical metadata and predecessor.
+`BEGIN IMMEDIATE` keeps concurrent writers from appending to the same predecessor.
+Legacy unsigned rows remain unverifiable. A later signature can anchor their
+migrated representation, but cannot prove their original authenticity.
 
-### Method 1: Directly from the Host (Simplest)
-If you are on the host server (e.g., `srv1` / `NUC2`), you can use the `sqlite3` CLI directly on the mounted volume file:
+Preserve the signing key and database together. The verifier is
+`scripts/verify_logs.py`; it must receive the correct key securely and the path to
+the database being inspected. Do not print either secret configuration or expanded
+environment values when diagnosing a failure.
 
-```bash
-# Query the last 10 validation logs
-sqlite3 ./database/audit.db "SELECT * FROM command_log ORDER BY id DESC LIMIT 10;"
+## Backup and recovery
 
-# Manually approve a blocked command (override)
-sqlite3 ./database/audit.db "UPDATE command_log SET status = 'approved', guardian_reason = 'Manual admin override' WHERE id = <LOG_ID>;"
+Use SQLite's backup API for a consistent snapshot, including committed WAL data.
+[Install and upgrade](INSTALL.md#existing-configuration-or-data) gives the migration
+procedure and preserves the original database. Stop the old writers before an
+upgrade and confirm ownership of the destination state directory.
 
-# Delete logs older than 30 days
-sqlite3 ./database/audit.db "DELETE FROM command_log WHERE timestamp < date('now', '-30 days');"
-
-# Defragment and optimize file size
-sqlite3 ./database/audit.db "VACUUM;"
-```
-
-### Method 2: Running SQLite inside the Container
-If you do not have `sqlite3` installed on the host, you can invoke the utility inside the running `lab-guardian` container (which has `sqlite3` pre-installed):
-
-```bash
-# Interactive SQLite shell
-docker exec -it lab-guardian sqlite3 /app/database/audit.db
-
-# Direct query execution
-docker exec -it lab-guardian sqlite3 /app/database/audit.db "SELECT id, timestamp, status, command FROM command_log ORDER BY id DESC LIMIT 5;"
-```
-
----
-
-## 🤖 Sharing the Database with Other Agents
-
-To allow other autonomous agents (e.g. Claude, OpenClaw, homeassistant, or custom cron scripts) to inspect the audit log or learn from historical validations, you can expose the database in two ways:
-
-### 1. Volume Sharing (Read-Only)
-For agents running in separate Docker containers on the same host, the safest approach is to mount the `./database` folder as a **read-only** volume. This prevents external agents from corrupting the logs.
-
-Add this volume mapping to the other agent's service in `docker-compose.yml`:
-
-```yaml
-services:
-  external-agent:
-    image: custom-agent:latest
-    volumes:
-      - ./database:/app/database:ro  # Mounted as Read-Only (ro)
-    environment:
-      - GUARDIAN_DB_PATH=/app/database/audit.db
-```
-
-The external agent can then query the database locally using any standard SQLite library (e.g. Python's `sqlite3` or Node.js `sqlite3`):
-
-```python
-import sqlite3
-
-def get_recent_blocks():
-    conn = sqlite3.connect('/app/database/audit.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT command, task FROM command_log WHERE status = 'denied' ORDER BY id DESC LIMIT 10")
-    blocks = cursor.fetchall()
-    conn.close()
-    return blocks
-```
-
-### 2. API-Based Sharing (Network Access)
-If the other agents run on different servers (e.g. over Tailscale) or cannot access the host filesystem, they can retrieve audits using the HTTP report endpoint.
-
-- **Endpoint**: `POST /report` (Authenticated via `X-API-Key`)
-- **Querying Reports**: While `/report` is write-only, you can inspect the SQLite state via the dashboard UI or create a custom read-only endpoint in `main.py` if needed.
-
----
-
-## 🧹 Database Maintenance & Backup
-
-- **Backup**: To safely back up the database without locking writes, use the SQLite backup API:
-  ```bash
-  sqlite3 ./database/audit.db ".backup ./database/audit_backup.db"
-  ```
-- **Integrity Check**:
-  ```bash
-  sqlite3 ./database/audit.db "PRAGMA integrity_check;"
-  ```
+A valid HMAC chain cannot detect deletion of a valid suffix or full rollback on
+its own. That requires a trusted external checkpoint. Storage is not encrypted,
+and redaction is not a guarantee that task text contains no secrets.

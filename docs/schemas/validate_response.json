@@ -1,11 +1,28 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "POST /validate response",
+  "title": "POST /validate HTTP 200 authorization response",
   "type": "object",
+  "required": ["approved", "reason", "intent_source", "validation_id", "system_one"],
   "properties": {
-    "approved": { "type": "boolean" },
-    "reason": { "type": ["string", "null"] },
-    "intent_source": { "type": "string", "enum": ["regex", "allowlist", "mapping", "llm", "policy", "skip", "system_load"] }
-  },
-  "required": ["approved", "reason", "intent_source"]
+    "approved": {"type": "boolean"},
+    "reason": {"type": "string"},
+    "intent_source": {
+      "enum": ["input", "shell", "allowlist", "regex", "regex_error", "mapping", "llm", "llm_error", "system_load"]
+    },
+    "validation_id": {"type": "string", "format": "uuid"},
+    "system_one": {
+      "type": "object",
+      "required": ["mode", "status", "decision_unchanged"],
+      "properties": {
+        "mode": {"enum": ["off", "shadow"]},
+        "status": {"enum": ["off", "not_run_baseline_rejected", "observed", "unavailable"]},
+        "decision_unchanged": {"const": true},
+        "probabilities": {
+          "type": "object",
+          "required": ["coherence", "unauthorized_transfer", "untrusted_instruction", "insufficient_context"],
+          "additionalProperties": {"type": "number", "minimum": 0, "maximum": 1}
+        }
+      }
+    }
+  }
 }

@@ -30,12 +30,12 @@ log_warn() { echo -e "${YELLOW}[!]${NC} $1"; }
 log_error() { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 
 check_command() {
-    command -v $1 &> /dev/null
+    command -v "$1" &> /dev/null
 }
 
 test_ollama_connection() {
     local host=$1
-    if curl -s --max-time 5 "$host/api/tags" &> /dev/null; then
+    if curl -fsS --max-time 5 "$host/api/tags" &> /dev/null; then
         return 0
     fi
     return 1
@@ -68,28 +68,39 @@ test_api_key() {
 
 log_info "Step 1/8: Checking prerequisites..."
 
+# Do not overwrite or rotate existing credentials/signing keys on reinstallation.
+if [ -e .env ]; then
+    log_error "Existing .env preserved. Review docs/INSTALL.md for upgrades; use docker compose directly."
+fi
+if [ -f database/audit.db ]; then
+    log_error "Legacy audit DB found. Back up and migrate it as documented before installation."
+fi
+check_command python3 || log_error "Python 3 is required to create secrets without printing them."
+umask 077
+LOCAL_UID=$(id -u)
+LOCAL_GID=$(id -g)
+[ "$LOCAL_UID" -ne 0 ] || log_error "Run the installer as a non-root Docker user."
+
 if ! check_command docker; then
     log_error "Docker not found. Install: https://docs.docker.com/get-docker/"
 fi
 
 if ! docker info &> /dev/null; then
-    log_error "Docker daemon not running. Start with: sudo systemctl start docker"
+    log_error "Docker daemon is unavailable. Ask your administrator to start it."
 fi
 
 log_success "Docker is installed and running"
 
-if check_command docker-compose; then
-    COMPOSE_CMD="docker-compose"
-else
-    COMPOSE_CMD="docker compose"
+if ! docker compose version >/dev/null 2>&1; then
+    log_error "Docker Compose v2 with --wait support is required."
 fi
+COMPOSE_CMD="docker compose"
 
 log_info "Step 2/8: LLM Provider Detection & Configuration"
 echo ""
 
 OLLAMA_DETECTED=false
 OLLAMA_LOCAL=false
-OLLAMA_REMOTE=false
 
 if check_command ollama; then
     if test_ollama_connection "http://localhost:11434"; then
@@ -110,7 +121,6 @@ if [ "$OLLAMA_DETECTED" = false ]; then
         if test_ollama_connection "$remote_host"; then
             log_success "Connected to Ollama at $remote_host"
             OLLAMA_DETECTED=true
-            OLLAMA_REMOTE=true
             OLLAMA_HOST="$remote_host"
         else
             log_warn "Cannot connect to $remote_host"
@@ -137,7 +147,6 @@ echo "  - Google Gemini"
 echo ""
 
 PRIMARY_PROVIDER=""
-FALLBACK_PROVIDERS=()
 
 if [ "$OLLAMA_DETECTED" = true ]; then
     if [ "$NON_INTERACTIVE" != "true" ]; then
@@ -167,7 +176,7 @@ if [ "$OLLAMA_DETECTED" = true ]; then
         MODEL_LIST=$(echo "$MODELS_JSON" | grep -oP '(?<="name":")[^"]*' 2>/dev/null || echo "$MODELS_JSON" | grep -o '"name":"[^"]*"' | sed 's/"name":"//g' | sed 's/"//g')
         
         # Convert to array
-        IFS=$'\n' read -rd '' -a ALL_MODELS <<< "$MODEL_LIST"
+        IFS=$'\n' read -rd '' -a ALL_MODELS <<< "$MODEL_LIST" || true
 
         if [ ${#ALL_MODELS[@]} -gt 0 ]; then
             echo ""
@@ -243,7 +252,7 @@ if [ "$OLLAMA_DETECTED" = true ]; then
         fi
 
         if [ "$NON_INTERACTIVE" != "true" ]; then
-            read -p "Configure cloud fallback provider? (y/n) [n]: " add_fallback
+            read -p "Store optional cloud credentials (no automatic fallback)? (y/n) [n]: " add_fallback
         fi
     fi
 else
@@ -269,7 +278,8 @@ if [ "$add_fallback" = "y" ] || [ -z "$PRIMARY_PROVIDER" ]; then
     case $cloud_choice in
         1)
             if [ "$NON_INTERACTIVE" != "true" ]; then
-                read -p "Enter Groq API key (from https://console.groq.com): " GROQ_API_KEY
+                read -r -s -p "Enter Groq API key (from https://console.groq.com): " GROQ_API_KEY
+                printf '\n'
             fi
             if [ -n "$GROQ_API_KEY" ]; then
                 log_info "Testing Groq connection..."
@@ -290,7 +300,8 @@ if [ "$add_fallback" = "y" ] || [ -z "$PRIMARY_PROVIDER" ]; then
             ;;
         2)
             if [ "$NON_INTERACTIVE" != "true" ]; then
-                read -p "Enter OpenAI API key: " OPENAI_API_KEY
+                read -r -s -p "Enter OpenAI API key: " OPENAI_API_KEY
+                printf '\n'
             fi
             if [ -n "$OPENAI_API_KEY" ]; then
                 log_info "Testing OpenAI connection..."
@@ -311,7 +322,8 @@ if [ "$add_fallback" = "y" ] || [ -z "$PRIMARY_PROVIDER" ]; then
             ;;
         3)
             if [ "$NON_INTERACTIVE" != "true" ]; then
-                read -p "Enter Anthropic API key: " ANTHROPIC_API_KEY
+                read -r -s -p "Enter Anthropic API key: " ANTHROPIC_API_KEY
+                printf '\n'
             fi
             if [ -n "$ANTHROPIC_API_KEY" ]; then
                 log_info "Testing Anthropic connection..."
@@ -332,7 +344,8 @@ if [ "$add_fallback" = "y" ] || [ -z "$PRIMARY_PROVIDER" ]; then
             ;;
         4)
             if [ "$NON_INTERACTIVE" != "true" ]; then
-                read -p "Enter DeepSeek API key: " DEEPSEEK_API_KEY
+                read -r -s -p "Enter DeepSeek API key: " DEEPSEEK_API_KEY
+                printf '\n'
             fi
             if [ -n "$DEEPSEEK_API_KEY" ]; then
                 log_info "DeepSeek key configured (no validation test available)"
@@ -345,7 +358,8 @@ if [ "$add_fallback" = "y" ] || [ -z "$PRIMARY_PROVIDER" ]; then
             ;;
         5)
             if [ "$NON_INTERACTIVE" != "true" ]; then
-                read -p "Enter Gemini API key: " GEMINI_API_KEY
+                read -r -s -p "Enter Gemini API key: " GEMINI_API_KEY
+                printf '\n'
             fi
             if [ -n "$GEMINI_API_KEY" ]; then
                 log_info "Gemini key configured (no validation test available)"
@@ -371,11 +385,11 @@ log_info "Step 3/8: Port Configuration"
 if [ "$NON_INTERACTIVE" != "true" ]; then
     read -p "Guardian API port [5000]: " guardian_port
     read -p "Agent API port [5001]: " agent_port
-    read -p "Web UI port [8080]: " ui_port
+    read -p "Web UI port [8081]: " ui_port
 fi
 GUARDIAN_PORT="${guardian_port:-5000}"
 AGENT_PORT="${agent_port:-5001}"
-UI_PORT="${ui_port:-8080}"
+UI_PORT="${ui_port:-8081}"
 
 # Generate a strong API key if not already provided via environment
 if [ -z "$API_KEY" ]; then
@@ -383,7 +397,18 @@ if [ -z "$API_KEY" ]; then
         || head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 43)
 fi
 
+# Keep code-generation model names consistent for local and cloud providers.
+if [ "$PRIMARY_PROVIDER" = "ollama" ]; then
+    LLM_MODEL_CODER="${OLLAMA_MODEL_CODER:-qwen2.5-coder:7b}"
+    LLM_MODEL_EXPLAIN="${OLLAMA_MODEL_EXPLAIN:-llama3.2:3b-instruct-q4_K_M}"
+fi
+TASK_API_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
+LOG_HMAC_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
+UI_PASSWORD=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
+SYSTEM_ONE_API_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
 log_info "Step 4/8: Generating .env configuration..."
+# noclobber also closes the race between the existence check and creation.
+set -o noclobber
 cat > .env << EOF
 # Generated by install.sh on $(date)
 # Primary Provider: $PRIMARY_PROVIDER
@@ -411,16 +436,25 @@ GUARDIAN_URL=http://guardian:5000
 GUARDIAN_PORT=$GUARDIAN_PORT
 AGENT_PORT=$AGENT_PORT
 UI_PORT=$UI_PORT
+LOCAL_UID=$LOCAL_UID
+LOCAL_GID=$LOCAL_GID
 
 # Database
-DB_PATH=/app/database/audit.db
+DB_PATH=/var/lib/guardian/audit.db
 
 # Security
 API_KEY=$API_KEY
 WORKSPACE_DIR=./workspace
 EXEC_UID=1000
 EXEC_GID=1000
-SANDBOX_MODE=false
+EXECUTE_COMMANDS=false
+TASK_API_KEY=$TASK_API_KEY
+LOG_HMAC_KEY=$LOG_HMAC_KEY
+UI_USERNAME=guardian
+UI_PASSWORD=$UI_PASSWORD
+SYSTEM_ONE_API_KEY=$SYSTEM_ONE_API_KEY
+SYSTEM_ONE_URL=http://system-one:8009/v1/systemone
+INTENT_LLM_MODEL=ollama/deepseek-coder-v2:16b
 
 # Logging
 LOG_LEVEL=INFO
@@ -435,50 +469,43 @@ log_success ".env file created"
 chmod 600 .env || log_warn "Could not set strict permissions on .env (platform limit)"
 
 log_info "Step 5/8: Initializing directories..."
-mkdir -p database workspace guardian/config
-chmod 755 database workspace
+mkdir -p state/audit state/learned
+chmod 700 state/audit state/learned
 
 log_info "Step 6/8: Building Docker images..."
-log_info "Building Guardian..."
-docker build -t guardian-mvp:latest -f guardian/Dockerfile guardian/ || log_error "Guardian build failed"
-
-log_info "Building Agent..."
-docker build -t agent-mvp:latest -f agent/Dockerfile agent/ || log_error "Agent build failed"
-
-log_info "Building UI..."
-docker build -t ui-mvp:latest -f ui/Dockerfile ui/ || log_error "UI build failed"
+# Compose owns the build contexts; Guardian is built from the repository root.
+$COMPOSE_CMD build guardian agent ui || log_error "Image build failed"
 
 log_success "All images built successfully"
 
 log_info "Step 7/8: Starting services..."
-$COMPOSE_CMD up -d || log_error "Failed to start services"
+$COMPOSE_CMD up -d --wait --wait-timeout 120 || log_error "Service startup/health checks failed"
 
-log_info "Step 8/8: Health checks (waiting 10 seconds)..."
-sleep 10
+log_info "Step 8/8: Verifying HTTP health checks..."
 
 AGENT_HEALTH=false
 GUARDIAN_HEALTH=false
 UI_HEALTH=false
 
-if curl -s --max-time 5 http://localhost:$AGENT_PORT/health &> /dev/null; then
+if curl -fsS --max-time 5 http://localhost:$AGENT_PORT/health &> /dev/null; then
     log_success "Agent running on port $AGENT_PORT"
     AGENT_HEALTH=true
 else
-    log_warn "Agent health check failed (check: docker logs lab-agent)"
+    log_warn "Agent health check failed (check: docker compose logs agent)"
 fi
 
-if curl -s --max-time 5 http://localhost:$GUARDIAN_PORT/health &> /dev/null; then
+if curl -fsS --max-time 5 http://localhost:$GUARDIAN_PORT/health &> /dev/null; then
     log_success "Guardian running on port $GUARDIAN_PORT"
     GUARDIAN_HEALTH=true
 else
-    log_warn "Guardian health check failed (check: docker logs lab-guardian)"
+    log_warn "Guardian health check failed (check: docker compose logs guardian)"
 fi
 
-if curl -s --max-time 5 http://localhost:$UI_PORT &> /dev/null; then
+if curl -fsS --max-time 5 http://localhost:$UI_PORT/health &> /dev/null; then
     log_success "Web UI running on port $UI_PORT"
     UI_HEALTH=true
 else
-    log_warn "Web UI health check failed (check: docker logs lab-ui)"
+    log_warn "Web UI health check failed (check: docker compose logs ui)"
 fi
 
 echo ""
@@ -496,11 +523,11 @@ echo "  Guardian API: http://localhost:$GUARDIAN_PORT"
 echo "  Web Dashboard: http://localhost:$UI_PORT"
 echo ""
 echo -e "${CYAN}Quick Test:${NC}"
-echo '  curl -X POST http://localhost:'$AGENT_PORT'/execute -H "Content-Type: application/json" -d '"'"'{"task": "show disk usage"}'"'"
+echo '  See docs/API.md for authenticated dry-run and trusted-task examples.'
 echo ""
 echo -e "${CYAN}View Logs:${NC}"
-echo "  docker logs lab-agent -f"
-echo "  docker logs lab-guardian -f"
+echo "  docker compose logs -f agent"
+echo "  docker compose logs -f guardian"
 echo ""
 echo -e "${CYAN}Documentation:${NC}"
 echo "  README.md - Project overview"
@@ -509,8 +536,8 @@ echo "  docs/CONFIGURATION.md - LLM provider setup"
 echo "  docs/API.md - API reference"
 echo ""
 
-if [ "$AGENT_HEALTH" = true ] && [ "$GUARDIAN_HEALTH" = true ]; then
+if [ "$AGENT_HEALTH" = true ] && [ "$GUARDIAN_HEALTH" = true ] && [ "$UI_HEALTH" = true ]; then
     echo -e "${GREEN}System is operational!${NC}"
 else
-    echo -e "${YELLOW}Some services failed health checks. Check logs for details.${NC}"
+    log_error "Some services failed health checks. Check logs; installation is not verified."
 fi

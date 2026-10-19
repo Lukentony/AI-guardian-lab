@@ -1,132 +1,167 @@
-# API Reference
+# API reference
 
-## Guardian (Port 5000)
+Guardian/Agent require `X-API-Key`, except public `GET /health` liveness checks.
+Never paste actual keys into examples or logs. The examples below reference keys
+already supplied securely to the calling process; `.env` is loaded by Compose,
+not automatically exported to your host shell.
 
-The Guardian service runs the validation pipeline. Every endpoint requires the `X-API-Key` header.
+## Guardian
 
 ### POST /validate
 
-Validates a command against the security pipeline.
+Use an explicit task for a research/dry-run request:
 
-Request:
 ```json
-{"command": "rm -rf /tmp", "task": "clean up temp files"}
+{"command":"df -h","task":"check disk usage"}
 ```
 
-Response — blocked by regex:
+Or bind to operator-owned task context:
+
 ```json
-{"approved": false, "reason": "Blocked by pattern: rm\\s+-rf\\s+/", "intent_source": "regex"}
+{"command":"ls /workspace","task_id":"<registered-task-id>"}
 ```
 
-Response — blocked by intent conflict:
+If both task and task_id are supplied, the task must match the stored original.
+An optional `untrusted_tool_output` string is bounded to 8,192 characters and
+never becomes a trusted instruction. Command length is 1,024 characters; task
+length is 4,096. Unsupported shell grammar is denied rather than guessed.
+
+A successful authorization response (HTTP 200) contains:
+
 ```json
-{"approved": false, "reason": "Intent conflict: task intent is read, command intent is delete", "intent_source": "mapping"}
+{
+  "approved": true,
+  "reason": "Approved",
+  "intent_source": "mapping",
+  "validation_id": "<validation-uuid>",
+  "system_one": {
+    "mode": "shadow",
+    "status": "unavailable",
+    "decision_unchanged": true
+  }
+}
 ```
 
-Response — allowed:
+`approved` is always a Boolean, not a truthy string. Possible sources include
+`input`, `shell`, `allowlist`, `regex`, `regex_error`, `mapping`, `llm`,
+`llm_error` and `system_load`. A model result never reverses a previous block.
+When `system_one.status=unavailable`, the baseline checks still decide whether
+to authorize the command. An unavailable observation is not a favorable assessment.
+
+Invalid JSON/types return 400, unauthorized access 401, invalid/expired/stale task
+context 409, and unavailable audit 503 with `approved=false`. Consumers must
+reject non-200, invalid schemas, missing identity and uncertain transport results.
+See [response schema](schemas/validate_response.json).
+
+### GET /audit
+
+Authenticated, rate-limited read API for the UI. Returns `stats` with `total`
+(validation decisions, not terminal outcomes), `executed` and `rejected`, plus
+at most 20 latest `commands` containing timestamp, task, command, status,
+llm_provider and guardian_reason. Audit access failure returns 503. UI receives
+this through its server-side credential and never mounts the SQLite directory.
+
+### POST /tasks
+
+Requires `X-API-Key` **and** `X-Task-Key`. `TASK_API_KEY` must differ from the Agent
+API key; never install it in the Agent or model container.
+
 ```json
-{"approved": true, "reason": null, "intent_source": "skip"}
+{
+  "task": "List project files only",
+  "workspace": "/workspace",
+  "allowed_destinations": [],
+  "ttl_seconds": 3600
+}
 ```
 
-Response — under load:
-```json
-{"approved": false, "reason": "Blocked: Guardian system under load, retry later", "intent_source": "system_load"}
-```
+Returns HTTP 201 with task_id, original task, policy version and expiry. Lifetime
+must be 60–86,400 seconds. Common credential-like task content is rejected;
+this is not a comprehensive secret detector or encrypted storage.
+
+### GET /tasks/<task_id>
+
+Returns registered context after authentication. Invalid or expired context
+returns 404. Only the operator can register a task.
 
 ### POST /report
 
-Log a command execution to the audit database.
+Report one terminal outcome for an approved validation:
 
-Request:
 ```json
-{"command": "df -h", "approved": true, "intent_source": "skip"}
+{
+  "validation_id": "<validation-uuid>",
+  "command": "df -h",
+  "status": "simulated"
+}
 ```
 
-Response:
-```json
-{"status": "logged"}
-```
+Statuses: `simulated`, `executed`, `execution_error`. The command digest must
+match the approval. Identical repeats are idempotent; conflicting reports return
+409. An authenticated Agent is trusted to report its outcome honestly. Validation
+alone logs `approved`, never `executed`.
 
-### GET /health
+### POST /learn
 
-Liveness check.
+Requires the same two operator headers as `/tasks`. Submit a bounded pattern and
+optional description. Success (201) means persistence succeeded. Failed persistence
+returns 503 without changing policy in just one worker. Pattern mining only
+proposes candidates; it cannot approve them.
 
-Response:
-```json
-{"status": "healthy"}
-```
+### POST /forensics/analyze
 
-## Agent (Port 5001)
+Authenticated request with a JSONL string and optional session_id. At most 500
+line breaks and 1 MiB, also subject to the HTTP body limit. OpenHands and SWE-agent
+arguments are preserved for annotation; OpenClaw remains explicitly unsupported.
+This endpoint analyzes supplied session data; it does not execute its commands.
+Forensic LLM availability affects completeness, not runtime authorization.
 
-The agent generates and optionally executes commands via Guardian. Every endpoint requires the `X-API-Key` header.
+## Agent
 
 ### POST /execute
 
-Generate a command from a task description, validate it through Guardian, and optionally execute in a sandbox.
+Task-only requests remain available for dry-run research:
 
-Request:
 ```json
-{"task": "show disk usage"}
+{"task":"show disk usage"}
 ```
 
-Response — executed:
+Real execution is disabled unless `EXECUTE_COMMANDS=true`, and additionally
+requires a registered task_id whose workspace matches `/workspace`:
+
 ```json
-{"status": "executed", "command": "df -h", "output": "Filesystem     1K-blocks      Used Available Use% Mounted on\n/dev/sda1       ..."}
+{"task_id":"<registered-task-id>"}
 ```
 
-Response — simulated (dry-run, `EXECUTE_COMMANDS` is not `true`):
-```json
-{"status": "simulated", "command": "df -h", "output": "[DRY-RUN] Command 'df -h' would be executed. Enable EXECUTE_COMMANDS=true for real action."}
-```
+The Agent fetches the original task, generates one command, consumes a strict
+Guardian approval and reports the outcome. Child execution does not inherit API
+keys, BASH_ENV or a caller-controlled PATH. This is still a research executor,
+not an OS sandbox. Timeout may leave side effects; do not assume rollback.
 
-Response — rejected by Guardian:
-```json
-{"status": "rejected", "command": "rm -rf /", "reason": "Intent conflict: task intent is read, command intent is delete"}
-```
+Responses include `simulated`, `rejected`, `executed`, `execution_error` or
+`outcome_unreported`. The last is HTTP 503 and includes
+`execution_may_have_occurred`: inspect the validation identity and executor state
+before any retry. Exactly-once execution is not provided.
 
-Response — error:
-```json
-{"status": "error", "reason": "Guardian auth failed"}
-```
+## UI and optional model service
 
-### GET /health
+UI uses Basic authentication (`UI_USERNAME`, `UI_PASSWORD`) on loopback port
+8081; `/health` alone is public. It does not expose the backend API credential.
+The optional model service uses a dedicated bearer key for `/v1/systemone` and
+publishes no host port in Compose. Its Kev runtime is **quarantined** until a
+compatible security update is available; see [System One](SYSTEM_ONE.md).
 
-Liveness check.
+## Authenticated dry-run example
 
-Response:
-```json
-{"status": "healthy"}
-```
-
-## UI (Port 8081)
-
-Web dashboard at `http://localhost:8081`.
-
-Interactive form to send commands, browse audit history, and test attack scenarios.
-
-## Examples
+From the repository root on the host running the services, in an existing shell
+with API_KEY already available securely:
 
 ```bash
-curl -s -X POST http://localhost:5000/validate \
+curl --fail-with-body http://127.0.0.1:5000/validate \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: your-api-key" \
-  -d '{"command": "df -h", "task": "check disk space"}'
+  -H "X-API-Key: ${API_KEY}" \
+  --data '{"command":"df -h","task":"check disk usage"}'
 ```
 
-```bash
-curl -s -X POST http://localhost:5001/execute \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your-api-key" \
-  -d '{"task": "show disk usage"}'
-```
-
-```python
-import requests
-
-response = requests.post(
-    "http://localhost:5000/validate",
-    json={"command": "ls /tmp", "task": "list temp files"},
-    headers={"X-API-Key": "your-api-key"}
-)
-print(response.json())
-```
+This checks a command; it does not execute it. Do not use `curl -v`, shell tracing
+or logs that expose the header.

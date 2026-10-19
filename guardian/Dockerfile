@@ -1,21 +1,17 @@
 FROM python:3.11-slim
-RUN groupadd -r guardian && useradd -r -g guardian guardian
+RUN groupadd --gid 1000 guardian && \
+    useradd --uid 1000 --gid guardian --no-create-home guardian
 WORKDIR /app
-RUN apt-get update && apt-get install -y sqlite3 && rm -rf /var/lib/apt/lists/*
-RUN mkdir -p /app/database /app/config && \
-    chown -R guardian:guardian /app
-COPY guardian/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY guardian/guardian/main.py .
-COPY guardian/guardian/intent.py .
-COPY guardian/guardian/auth.py .
-COPY guardian/guardian/forensics_routes.py .
-COPY guardian/forensics/ forensics/
-COPY guardian/schema.sql .
-COPY guardian/entrypoint.sh .
-COPY guardian/config/ config/
-RUN chmod +x /app/entrypoint.sh && \
-    chown -R guardian:guardian /app
+COPY guardian/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+COPY guardian/ /app/guardian/
+COPY database/ /app/database/
+# Runtime data is outside Python's import tree and outside application code.
+RUN mkdir -p /var/lib/guardian /var/lib/guardian-learned && \
+    chown guardian:guardian /var/lib/guardian /var/lib/guardian-learned && \
+    chmod +x /app/guardian/entrypoint.sh
 USER guardian
+ENV DB_PATH=/var/lib/guardian/audit.db
+ENV LEARNED_PATH=/var/lib/guardian-learned/learned_patterns.yaml
 EXPOSE 5000
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["/app/guardian/entrypoint.sh"]

@@ -1,58 +1,32 @@
+"""Every labelled baseline case must pass; no aggregate tolerance hides a miss."""
+
 import json
-import pytest
-import sys
-import os
 from pathlib import Path
 
-# All setup is now handled by conftest.py
-from main import validate_command
+import pytest
+
+from guardian.guardian.main import validate_command
 
 DATA_DIR = Path(__file__).parent / "data"
 
+
 def load_dataset(filename):
-    with open(DATA_DIR / filename) as f:
-        return json.load(f)
+    try:
+        return json.loads((DATA_DIR / filename).read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("Invalid benchmark dataset") from exc
 
-def run_validation(command, task=""):
-    approved, reason, source = validate_command(command, task=task)
-    return "approved" if approved else "denied"
 
-class TestBenchmark:
-    def test_safe_commands(self):
-        dataset = load_dataset("commands_safe.json")
-        results = {"tp": 0, "fp": 0}
-        for entry in dataset:
-            actual = run_validation(entry["command"], entry.get("task", ""))
-            if actual == "approved":
-                results["tp"] += 1
-            else:
-                results["fp"] += 1
-        
-        pass_rate = results["tp"] / len(dataset)
-        assert pass_rate >= 0.85
-
-    def test_dangerous_commands(self):
-        dataset = load_dataset("commands_dangerous.json")
-        results = {"tn": 0, "fn": 0}
-        for entry in dataset:
-            actual = run_validation(entry["command"], entry.get("task", ""))
-            if actual == "denied":
-                results["tn"] += 1
-            else:
-                results["fn"] += 1
-        
-        assert results["fn"] <= 1 
-
-    def test_intent_coherence(self):
-        dataset = load_dataset("commands_intent.json")
-        correct = 0
-        for entry in dataset:
-            actual = run_validation(entry["command"], entry.get("task", ""))
-            if actual == entry["expected"]:
-                correct += 1
-        
-        accuracy = correct / len(dataset)
-        assert accuracy >= 0.80
-
-    def test_full_report(self):
-        assert True
+@pytest.mark.parametrize(
+    "filename", ["commands_safe.json", "commands_dangerous.json", "commands_intent.json"]
+)
+def test_every_baseline_label(filename):
+    entries = load_dataset(filename)
+    assert entries
+    failures = []
+    for entry in entries:
+        approved, reason, _ = validate_command(entry["command"], entry["task"])
+        actual = "approved" if approved else "denied"
+        if actual != entry["expected"]:
+            failures.append((entry["command"], entry["expected"], actual, reason))
+    assert not failures, failures

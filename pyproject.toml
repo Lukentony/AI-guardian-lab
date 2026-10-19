@@ -1,13 +1,9 @@
 [tool.pytest.ini_options]
-# Senior touch: explicitly define python path and ignore folders that cause namespace collisions
-pythonpath = [
-  "guardian",
-  "guardian/guardian",
-  "."
-]
+# Canonical package imports avoid competing main.py/intent.py instances.
+pythonpath = ["."]
 testpaths = ["tests"]
-# Ignore the agent directory during collection to avoid 'main.py' name collision
-norecursedirs = ["agent", ".git", ".venv", "workspace"]
+# Agent tests in tests/test_agent.py run normally; do not collect dependency trees.
+norecursedirs = [".git", ".venv", "workspace", "state"]
 python_files = ["test_*.py"]
 addopts = "-v --tb=short"
 filterwarnings = [

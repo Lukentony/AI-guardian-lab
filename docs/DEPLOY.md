@@ -1,41 +1,30 @@
-# Deployment Guide
+# Deployment
 
-## Prerequisites
-- **Ubuntu 24.04** or any modern Linux/Windows/macOS with Docker.
-- **Docker + Docker Compose (V2)**
-- **Python 3.11+**
-- **Accessible Ollama Server** (Local or Remote)
+The lab is for local research. Real execution still needs an OS-level sandbox;
+the supplied containers do not provide one. The optional Kev model service is
+quarantined because of a dependency security conflict.
 
-## Installation
+Use [Install](INSTALL.md) for first installation or upgrade. It covers credentials,
+Compose build contexts, state-directory ownership and audit migration. Follow it
+on the chosen host from a dedicated terminal at the repository root. Do not rerun
+the installer over an existing `.env`.
 
-```bash
-# 1. Clone the project
-git clone https://github.com/Lukentony/ai-guardian-lab.git
-cd ai-guardian-lab
+## Before starting services
 
-# 2. Build and Start the stack
-docker compose up -d
+- Back up existing configuration, audit state and its signing key.
+- Match `LOCAL_UID` and `LOCAL_GID` to the owner of the state directories.
+- Keep the published ports on loopback. Remote access needs a separately reviewed
+  authenticated TLS endpoint.
+- Leave `EXECUTE_COMMANDS=false` unless execution and isolation have been approved.
 
-# 3. Verify deployment
-docker compose ps
-curl http://localhost:5001/health
-```
+Compose manages the `agent-net` network. Do not create a separate network by hand
+to work around a failed startup. Inspect the error and correct its cause.
 
-## Operational Guidelines
-The laboratory is designed to be **Fail-Closed**. 
-- Ensure your `API_KEY` is set in `.env`.
-- Review `guardian/config/policy.yaml` to allow necessary binaries.
+## Verification and recovery
 
-## Troubleshooting
+The ordinary-service smoke workflow is prepared, but Docker was unavailable for
+local verification. Image startup, volume permissions and recovery still need to
+be checked on a Docker-equipped test host before deployment.
 
-### Network Issues
-Ensure `agent-net` is created by Docker Compose. If not:
-```bash
-docker network create agent-net
-```
-
-### Unprivileged Permissions
-If the containers fail to write to the `database/` folder, ensure the host directory has write permissions for the container users (UID 1000/1001).
-
----
-*"Security and stability over feature bloat."*
+[Verification](VERIFICATION.md) records what has actually passed.
+[Architecture](../ARCHITETTURA.md) describes network boundaries and recovery limits.

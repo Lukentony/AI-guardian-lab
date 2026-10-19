@@ -1,15 +1,15 @@
-import json
 import uuid
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
-from forensics.parser import ForensicsEvent, ForensicsSession
-from forensics.annotator import AnnotatedEvent, AnnotatedSession
-from forensics.analyzer import BehaviorReport, AnalysisFlag
+
+from guardian.forensics.analyzer import BehaviorReport
+from guardian.forensics.annotator import AnnotatedSession
+
 
 @dataclass
 class ForensicsReport:
-    report_id: str            # uuid4
-    generated_at: str         # ISO8601
+    report_id: str  # uuid4
+    generated_at: str  # ISO8601
     session_id: str
     framework: str
     initial_task: str | None
@@ -18,9 +18,9 @@ class ForensicsReport:
     anomaly_score: int
     risk_progression: list[int]
     max_risk_score: int
-    flags: dict               # {"escalation": AnalysisFlag, "intent_drift": AnalysisFlag, "injection_signals": AnalysisFlag}
-    summary: str              # human-readable, 3-5 sentences
-    timeline: list[dict]      # one entry per tool_call event only
+    flags: dict  # {"escalation": AnalysisFlag, "intent_drift": AnalysisFlag, "injection_signals": AnalysisFlag}
+    summary: str  # human-readable, 3-5 sentences
+    timeline: list[dict]  # one entry per tool_call event only
 
     def to_dict(self) -> dict:
         """Returns a full JSON-serializable dict with nested AnalysisFlag objects."""
@@ -28,6 +28,7 @@ class ForensicsReport:
 
     def to_text(self) -> str:
         """Returns a human-readable formatted text block."""
+
         def format_flag(name, flag):
             status = "TRIGGERED" if flag["triggered"] else "clear"
             conf = flag["confidence"]
@@ -63,14 +64,15 @@ SUMMARY:
 """
         return report_text
 
+
 def generate_report(report: BehaviorReport, session: AnnotatedSession) -> ForensicsReport:
     """Generates a structured ForensicsReport from behavior analysis and session data."""
     report_id = str(uuid.uuid4())
     generated_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-    
+
     tool_calls = [ae for ae in session.events if ae.event.type == "tool_call"]
     tool_call_count = len(tool_calls)
-    
+
     # 1. Build timeline
     timeline = []
     for ae in tool_calls:
@@ -86,36 +88,38 @@ def generate_report(report: BehaviorReport, session: AnnotatedSession) -> Forens
                 input_preview = str(ae.event.tool_input)
         elif ae.event.content:
             input_preview = ae.event.content
-            
-        timeline.append({
-            "seq": ae.event.seq,
-            "tool_name": ae.event.tool_name,
-            "binary": ae.annotation.binary,
-            "operation_type": ae.annotation.operation_type,
-            "policy_zone": ae.annotation.policy_zone,
-            "risk_score": ae.annotation.risk_score,
-            "truncated_input": input_preview[:120]
-        })
-        
+
+        timeline.append(
+            {
+                "seq": ae.event.seq,
+                "tool_name": ae.event.tool_name,
+                "binary": ae.annotation.binary,
+                "operation_type": ae.annotation.operation_type,
+                "policy_zone": ae.annotation.policy_zone,
+                "risk_score": ae.annotation.risk_score,
+                "truncated_input": input_preview[:120],
+            }
+        )
+
     # 2. Build flags dict
     flags = {
         "escalation": asdict(report.escalation),
         "intent_drift": asdict(report.intent_drift),
-        "injection_signals": asdict(report.injection_signals)
+        "injection_signals": asdict(report.injection_signals),
     }
-    
+
     # 3. Build summary
     summary_parts = [
         f"Session {session.session.session_id} ({session.session.framework}): "
         f"{tool_call_count} tool calls, anomaly score {report.anomaly_score}/100."
     ]
-    
+
     if session.session.initial_task:
         task_trunc = session.session.initial_task[:80]
         if len(session.session.initial_task) > 80:
             task_trunc += "..."
         summary_parts.append(f"Initial task: {task_trunc}.")
-        
+
     triggered_flag_found = False
     for flag_obj in [report.escalation, report.intent_drift, report.injection_signals]:
         if flag_obj.triggered and flag_obj.reason:
@@ -123,12 +127,12 @@ def generate_report(report: BehaviorReport, session: AnnotatedSession) -> Forens
             if not summary_parts[-1].endswith("."):
                 summary_parts[-1] += "."
             triggered_flag_found = True
-            
+
     if not triggered_flag_found:
         summary_parts.append("No anomalies detected.")
-        
+
     summary = " ".join(summary_parts)
-    
+
     return ForensicsReport(
         report_id=report_id,
         generated_at=generated_at,
@@ -142,5 +146,5 @@ def generate_report(report: BehaviorReport, session: AnnotatedSession) -> Forens
         max_risk_score=session.max_risk_score,
         flags=flags,
         summary=summary,
-        timeline=timeline
+        timeline=timeline,
     )

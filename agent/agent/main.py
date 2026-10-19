@@ -1,183 +1,215 @@
-from flask import Flask, request, jsonify
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-import requests
+"""Demo agent. Authorization and execution outcomes are separate audit events."""
+
+import hmac
 import os
 import re
-import hmac
 import subprocess
+from pathlib import Path
+
+import requests
+from flask import Flask, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from litellm import completion
 
 app = Flask(__name__)
-
-GUARDIAN_URL = os.getenv('GUARDIAN_URL', 'http://guardian:5000')
-OLLAMA_URL = os.getenv('OLLAMA_URL', 'http://host.docker.internal:11434')
-LLM_PROVIDER = os.getenv('LLM_PROVIDER', 'ollama')
-LLM_MODEL_CODER = os.getenv('LLM_MODEL_CODER', 'qwen2.5-coder:7b')
-API_KEY = os.getenv('API_KEY', '')
-
+app.config["MAX_CONTENT_LENGTH"] = 16384
+GUARDIAN_URL = os.getenv("GUARDIAN_URL", "http://guardian:5000")
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://host.docker.internal:11434")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
+LLM_MODEL_CODER = os.getenv("LLM_MODEL_CODER", "qwen2.5-coder:7b")
+API_KEY = os.getenv("API_KEY", "")
+EXECUTE_COMMANDS = os.getenv("EXECUTE_COMMANDS", "false").lower() == "true"
+EXECUTION_WORKSPACE = os.getenv("EXECUTION_WORKSPACE", "/workspace")
 limiter = Limiter(
     get_remote_address,
     app=app,
     default_limits=["200 per day", "50 per hour"],
-    storage_uri=os.environ.get("RATE_LIMIT_STORAGE_URI", "memory://"),
+    storage_uri=os.getenv("RATE_LIMIT_STORAGE_URI", "memory://"),
 )
 
-def check_auth():
-    if not API_KEY:
-        # FAIL CLOSED: reject all requests when no API_KEY is configured
-        print("WARNING: API_KEY not set — rejecting request (fail-closed)")
-        return False
 
-    auth_header = request.headers.get('X-API-Key', '')
-    # Constant-time comparison to prevent timing attacks
-    return hmac.compare_digest(auth_header, API_KEY)
+def check_auth():
+    return bool(
+        API_KEY
+        and API_KEY != "CHANGE_ME"
+        and hmac.compare_digest(request.headers.get("X-API-Key", "").encode(), API_KEY.encode())
+    )
+
 
 def get_auth_headers():
-    if API_KEY:
-        return {'X-API-Key': API_KEY}
-    return {}
+    return {"X-API-Key": API_KEY} if API_KEY else {}
+
 
 def clean_command(text):
-    # Try to extract content inside ```bash ... ``` or ``` ... ```
-    # This regex looks for code blocks and captures the inner content
-    code_block_pattern = r'```(?:bash)?\s*(.*?)\s*```'
-    match = re.search(code_block_pattern, text, re.DOTALL)
-    if match:
-        text = match.group(1)
-    else:
-        # Fallback: just strip delimiters if regex didn't match (maybe just single ticks or user sent code without blocks)
-        text = re.sub(r'```bash\n?', '', text)
-        text = re.sub(r'```\n?', '', text)
-        text = re.sub(r'`', '', text)
-    
-    return text.strip()
+    if not isinstance(text, str):
+        raise ValueError("Command generation returned a non-string")
+    match = re.fullmatch(r"\s*```(?:bash)?\s*\n?(.*?)\n?```\s*", text, re.DOTALL)
+    return (match.group(1) if match else text).strip()
 
 
 # SECURITY NOTICE: This function executes LLM-generated commands directly in the
 # container via /bin/bash -c. Intended for DEMO/RESEARCH only. In production, replace
 # with a proper sandbox (gVisor, Firejail, nsjail, or ephemeral VM per execution).
 def run_command(command):
-    """Executes a bash command safely with a timeout."""
     try:
-        # SEC-SAFE: We run the command via /bin/bash -c for flexibility, 
-        # but within the containerized Agent environment.
-        print(f"--- EXECUTION START: {command} ---")
+        # Do not inherit API keys, model tokens, BASH_ENV or attacker-modified PATH.
         result = subprocess.run(
-            ["/bin/bash", "-c", command],
+            ["/bin/bash", "--noprofile", "--norc", "-c", command],
             capture_output=True,
             text=True,
-            timeout=30
+            timeout=30,
+            cwd=EXECUTION_WORKSPACE,
+            env={
+                "PATH": "/usr/bin:/bin",
+                "HOME": "/tmp",
+                "LANG": "C.UTF-8",
+                "GIT_CONFIG_NOSYSTEM": "1",
+                "GIT_CONFIG_GLOBAL": "/dev/null",
+            },
         )
-        print(f"--- EXECUTION COMPLETE (Code: {result.returncode}) ---")
-        return {
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "exit_code": result.returncode
-        }
+        return {"stdout": result.stdout, "stderr": result.stderr, "exit_code": result.returncode}
     except subprocess.TimeoutExpired:
-        return {"error": "Command timed out after 30s", "exit_code": 124}
-    except Exception as e:
-        print(f"CRITICAL: Failed to execute command: {e}")
-        return {"error": str(e), "exit_code": 1}
+        # Timeout does not mean no side effect occurred; never retry execution here.
+        return {"error": "Command timed out; side effects may have occurred", "exit_code": 124}
+    except OSError:
+        return {"error": "Execution failed", "exit_code": 1}
 
-@app.route('/health', methods=['GET'])
+
+def generate_command(task):
+    if LLM_PROVIDER == "ollama":
+        response = requests.post(
+            f"{OLLAMA_URL}/api/generate",
+            json={
+                "model": LLM_MODEL_CODER,
+                "prompt": f"Generate a bash command for: {task}. Return ONLY the command, no markdown.",
+                "stream": False,
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("Invalid generation response")
+        return clean_command(payload.get("response"))
+    response = completion(
+        model=LLM_MODEL_CODER,
+        messages=[{"role": "user", "content": f"Generate a bash command for: {task}"}],
+        timeout=30,
+        max_retries=0,
+    )
+    choices = getattr(response, "choices", None)
+    if not isinstance(choices, list) or len(choices) != 1:
+        raise ValueError("Invalid generation response")
+    return clean_command(getattr(getattr(choices[0], "message", None), "content", None))
+
+
+@app.get("/health")
 def health():
     return jsonify({"status": "healthy"}), 200
 
-SANDBOX_MODE = os.getenv("EXECUTE_COMMANDS", "false").lower() == "true"
 
-@app.route('/execute', methods=['POST'])
+@app.post("/execute")
 @limiter.limit("60 per minute")
 def execute():
     if not check_auth():
         return jsonify({"error": "Unauthorized"}), 401
-    
     data = request.get_json(silent=True)
-    if data is None:
-        return jsonify({"error": "Invalid JSON or missing Content-Type"}), 400
-    
-    task = data.get('task', '')
-    
+    if not isinstance(data, dict):
+        return jsonify({"error": "JSON object required"}), 400
+    task, task_id = data.get("task"), data.get("task_id")
+    if EXECUTE_COMMANDS and not task_id:
+        return jsonify({"error": "Real execution requires a registered task_id"}), 400
     try:
-        if LLM_PROVIDER == 'ollama':
-            # Use direct requests for Ollama to avoid LiteLLM issues
-            resp = requests.post(
-                f"{OLLAMA_URL}/api/generate",
-                json={
-                    "model": LLM_MODEL_CODER,
-                    "prompt": f"Generate a bash command for: {task}. Return ONLY the command, no markdown.",
-                    "stream": False
-                },
-                timeout=30
+        if task_id is not None:
+            if not isinstance(task_id, str) or len(task_id) > 64:
+                return jsonify({"error": "Invalid task_id"}), 400
+            response = requests.get(
+                f"{GUARDIAN_URL}/tasks/{task_id}", headers=get_auth_headers(), timeout=5
             )
-            if resp.status_code != 200:
-                raise Exception(f"Ollama API error: {resp.text}")
-            content = resp.json().get('response', '')
-        else:
-            response = completion(
-                model=LLM_MODEL_CODER,
-                messages=[{"role": "user", "content": f"Generate a bash command for: {task}"}]
-            )
-            content = response.choices[0].message.content
-        
-        command = clean_command(content)
-        
-        validation = requests.post(
-            f"{GUARDIAN_URL}/validate",
-            json={
-                "command": command,
-                "task": task,
-                "llm_provider": LLM_PROVIDER
-            },
-            headers=get_auth_headers(),
-            timeout=5
+            response.raise_for_status()
+            context = response.json()
+            if not isinstance(context, dict) or context.get("trust") != "registered":
+                raise ValueError("Invalid trusted task context")
+            if task is not None and task != context.get("task"):
+                return jsonify({"error": "Task differs from registered task"}), 409
+            task = context.get("task")
+            if EXECUTE_COMMANDS and (
+                context.get("workspace") != EXECUTION_WORKSPACE
+                or not Path(EXECUTION_WORKSPACE).is_dir()
+            ):
+                return jsonify(
+                    {"error": "Registered workspace is not the configured execution workspace"}
+                ), 409
+        if not isinstance(task, str) or not task.strip() or len(task) > 4096:
+            return jsonify({"error": "An explicit bounded task is required"}), 400
+        command = generate_command(task)
+        validation_body = {"command": command, "task": task, "llm_provider": LLM_PROVIDER}
+        if task_id:
+            validation_body["task_id"] = task_id
+        response = requests.post(
+            f"{GUARDIAN_URL}/validate", json=validation_body, headers=get_auth_headers(), timeout=5
         )
-        
-        if validation.status_code == 401:
-            return jsonify({"status": "error", "reason": "Guardian auth failed"}), 500
-        
-        val_data = validation.json()
-        
-        if val_data.get('approved'):
-            if not SANDBOX_MODE:
-                # Senior-level feature: Safe dry-run by default
-                # EXECUTE_COMMANDS must be 'true' for real execution
-                return jsonify({
-                    "status": "simulated",
+        response.raise_for_status()
+        validation = response.json()
+        if not isinstance(validation, dict) or type(validation.get("approved")) is not bool:
+            raise ValueError("Invalid Guardian authorization response")
+        if validation["approved"] is False:
+            return jsonify(
+                {
+                    "status": "rejected",
                     "command": command,
-                    "output": f"[DRY-RUN] Command '{command}' would be executed. Enable EXECUTE_COMMANDS=true for real action.",
-                    "stderr": "",
-                    "exit_code": 0,
-                    "note": "EXECUTE_COMMANDS is false (default). No real execution occurred.",
-                    "llm_provider": LLM_PROVIDER
-                }), 200
-
-            # PHASE 1: Real command execution (only if EXECUTE_COMMANDS=true)
-            exec_result = run_command(command)
-            
-            return jsonify({
-                "status": "executed",
-                "command": command,
-                "output": exec_result.get("stdout", ""),
-                "stderr": exec_result.get("stderr", ""),
-                "exit_code": exec_result.get("exit_code", 0),
-                "error": exec_result.get("error", ""),
-                "llm_provider": LLM_PROVIDER
-            }), 200
+                    "reason": validation.get("reason", "Blocked"),
+                }
+            ), 200
+        validation_id = validation.get("validation_id")
+        if not isinstance(validation_id, str) or not 0 < len(validation_id) <= 64:
+            raise ValueError("Missing validation identity")
+        if EXECUTE_COMMANDS:
+            outcome = run_command(command)
+            status = "executed" if outcome["exit_code"] == 0 else "execution_error"
         else:
-            return jsonify({
-                "status": "rejected",
+            status = "simulated"
+            outcome = {
+                "stdout": "[DRY-RUN] Approved command was not executed.",
+                "stderr": "",
+                "exit_code": 0,
+            }
+        try:
+            report = requests.post(
+                f"{GUARDIAN_URL}/report",
+                json={"validation_id": validation_id, "command": command, "status": status},
+                headers=get_auth_headers(),
+                timeout=5,
+            )
+            report.raise_for_status()
+        except (requests.RequestException, ValueError):
+            # An uncertain outcome must remain visible. Never repeat the command
+            # automatically just because its post-execution report was lost.
+            return jsonify(
+                {
+                    "status": "outcome_unreported",
+                    "execution_may_have_occurred": EXECUTE_COMMANDS,
+                    "validation_id": validation_id,
+                    "reason": "Check audit and agent state; do not blindly retry",
+                }
+            ), 503
+        return jsonify(
+            {
+                "status": status,
                 "command": command,
-                "reason": val_data.get('reason', ''),
-                "explanation": val_data.get('reason', ''),
-                "llm_provider": LLM_PROVIDER
-            }), 200
-            
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"status": "error", "reason": str(e)}), 500
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001)
+                "validation_id": validation_id,
+                "output": outcome.get("stdout", ""),
+                "stderr": outcome.get("stderr", ""),
+                "exit_code": outcome["exit_code"],
+                "error": outcome.get("error", ""),
+                "llm_provider": LLM_PROVIDER,
+            }
+        ), 200
+    except (requests.RequestException, ValueError, TypeError):
+        return jsonify(
+            {
+                "status": "error",
+                "reason": "Generation or Guardian validation unavailable; command not executed",
+            }
+        ), 502

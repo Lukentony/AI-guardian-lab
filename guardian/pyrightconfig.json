@@ -1,0 +1,5 @@
+{
+  "extends": "../pyrightconfig.json",
+  "venvPath": "..",
+  "extraPaths": [".."]
+}

@@ -8,9 +8,14 @@ venv/
 env/
 ENV/
 .venv/
+.venv-system-one/
+state/
+model-cache/
 
 # Environment & Secrets
 .env
+.env.*
+!.env.example
 *.key
 *.pem
 

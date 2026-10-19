@@ -1,32 +1,32 @@
-# AI LAB SECURITY POLICY
+# Runtime security policy
 
-## CURRENT STATUS: STABLE / HARDENED
+This page summarizes the current configuration. The actual rules live in
+`guardian/config/policy.yaml` and the validator; this document does not override
+them. See [Security](SECURITY.md) for reporting and known limits.
 
-### Active Permissions (Zero-Trust)
-✅ **Mandatory Binary Allowlist**: Binary execution is restricted to the `green` and `yellow` zones in `policy.yaml`.
-✅ **Resource Quotas**: CPU and Memory limits are enforced per service to prevent Local DoS.
-✅ **Non-Privileged Execution**: All services run as unprivileged Linux users (`agent`, `guardian`, `ui`).
-✅ **Network Isolation**: Containers communicate within a private `agent-net` bridge with no exposed ports except for UI and Agent API.
+## Authorization
 
-### Hardened Configuration
-🔒 **Fail-Closed Auth**: No `API_KEY` = No access.
-🔒 **ReDoS Protection**: Mandatory 1.0s timeout on all security regex evaluations.
-🔒 **Data Privacy**: Automatic masking of 10+ types of credentials in all audit logs.
+Guardian checks the restricted shell grammar, every executable, patterns and task
+effects. Required semantic review must return a valid affirmative assessment.
+A model cannot reverse a deterministic rejection. System One accepts only `off`
+or `shadow` and has no authorization role.
 
----
+Guardian and Agent require an API key outside their public health endpoints.
+Registering a task or approving a learned pattern also requires the separate
+operator key. Simulation is the default; real execution needs a registered task
+and a matching workspace.
 
-## PRODUCTION MODE (Sandbox Ready)
-The environment is now ready for autonomous agent experimentation. While not a "bulletproof fortress," it provides a robust defense-in-depth shield against common agent failures and prompt-injection-driven destructive commands.
+## Deployment boundaries
 
----
-**TRANSITION CHECKLIST**: 
-- [x] Guardian tested (9/9)
-- [x] Agent tested
-- [x] Docker Compose resource limits verified
-- [x] **V1.1.3 Patch**: Closed 6 architectural security gaps (DoS, Bypass, Persistence). 🛡️
-- [x] **V1.1.2 Patch**: Resolved 5 critical vulnerabilities reported in the security audit. 🛡️
-- [x] **Phase 3 Completion**: Hardened sandboxing and zonal allowlisting.
+Compose configures non-root processes, resource limits and loopback-only host
+ports. The UI requires Basic authentication and retrieves audit data through
+Guardian; it does not mount SQLite. These settings still need Docker verification
+on the target host and do not amount to a production sandbox.
 
-Last Update: 2026-02-19
-Current ModState: **STABLE / HARDENED (V1.1.3)**
-Philosophy: *"Security and stability over feature bloat."*
+Regex searches have a 50 ms engine timeout. Timeout or invalid pattern state
+denies validation. Audit records use a transactional HMAC chain; redaction is
+best-effort and storage is not encrypted.
+
+The optional Kev CPU runtime is quarantined. Do not clear its startup gate until
+a compatible patched dependency set has passed review and evaluation. Current
+checks and remaining work are recorded in [Verification](VERIFICATION.md).
