@@ -1,7 +1,6 @@
 # Roadmap
 
-The hardening branch repairs the v1.2.0 validator and adds a shadow-mode System
-One client. It remains a research lab. See [Verification](VERIFICATION.md) for
+Version 1.3 repairs the v1.2.0 validator and adds a shadow-mode System One client. It remains a research lab. See [Verification](VERIFICATION.md) for
 measured results rather than treating this roadmap as a completion record.
 
 ## Next work

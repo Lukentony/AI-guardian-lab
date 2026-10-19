@@ -1,20 +1,25 @@
 # Changelog
 
 Entries below record earlier releases. Their original layer numbering and security
-claims are historical, not verification of the current branch. The hardening work
+claims are historical, not verification of release 1.3.0. The hardening work
 uses L3 for deterministic intent mapping and L4 for semantic review. See
 [Verification](VERIFICATION.md) for current results.
 
-## Unreleased hardening branch
+## [1.3.0] - 2026-10-19
+
+Introduces the shadow-only System One observer, which records a local model's
+assessment of coherence, unauthorized transfer, untrusted instructions and
+missing context. The observer cannot change an authorization decision. Its
+bundled CPU candidate is quarantined after failing the latency budget on every
+calibration case and after a PyTorch advisory and compatibility conflict.
 
 - Added restricted shell parsing and complete command-effect checks.
 - Replaced worker-thread regex timeouts with engine-enforced timeouts that deny
   on failure. Required semantic responses now use strict validation.
 - Unified audit storage and signing, repaired forensic argument handling, and
   made pattern promotion an operator action.
-- Repaired installation and UI access. Added a shadow-only System One client.
-- Quarantined the CPU model candidate after latency and dependency-security
-  checks failed. Container verification remains pending.
+- Repaired installation and UI access.
+- Quarantined the CPU model candidate. Container verification remains pending.
 
 ## [1.2.0] - 2026-03-06
 

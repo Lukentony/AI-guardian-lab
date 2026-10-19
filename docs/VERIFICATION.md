@@ -1,7 +1,7 @@
 # Verification record: hardening and System One
 
-Scope: local branch `feature/system-one-hardening`, based on
-`15b6f6672a6a12546e25e795d66a91919c93f02f`. This is not a production approval.
+Scope: release candidate 1.3.0 on local branch `feature/system-one-hardening`,
+based on `15b6f6672a6a12546e25e795d66a91919c93f02f`. This is not a production approval.
 No GitHub publication, remote deployment or model-based enforcement was performed.
 
 ## Executed checks

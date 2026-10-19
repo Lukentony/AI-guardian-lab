@@ -1,5 +1,9 @@
 # AI Guardian Lab
 
+![Version](https://img.shields.io/badge/version-1.3.0-blue)
+![Status](https://img.shields.io/badge/status-experimental-orange)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 AI Guardian Lab checks shell commands before a cooperating AI agent runs them.
 The agent proposes a command; Guardian checks it against policy and the task.
 The agent then simulates the action or, when explicitly enabled, executes it.
@@ -9,6 +13,24 @@ Created and maintained by [Luca Rivoiro](https://github.com/Lukentony).
 > **Research software.** Real execution is disabled by default. Enabling it runs
 > `/bin/bash -c` without a complete OS-level sandbox. Do not give the executor
 > sensitive workspaces or untrusted workloads on the assumption Docker is enough.
+
+## What 1.3 adds
+
+Version 1.3 adds System One, an observer that asks a small local model four typed
+questions about a command, its task and recent context: whether the action fits
+the task, whether it moves data without authorization, whether it follows
+untrusted instructions, and whether the recorded context is sufficient. The
+answers are stored in the signed audit record of the decision.
+
+It runs after the deterministic checks and before any required semantic review.
+It has no authority: it cannot approve, block or rewrite a command, and a
+favorable observation never skips L4. See [System One](docs/SYSTEM_ONE.md).
+
+The bundled CPU candidate did not pass qualification. All eight calibration cases
+missed the 500 ms budget, and it rated a harmless listing as high risk on data
+transfer. Its PyTorch dependency also conflicts with security updates, so the
+model service is quarantined before startup. The observer client, datasets and
+evaluation script are included; enforcement is not.
 
 ## Command checks
 
