@@ -5,6 +5,16 @@ claims are historical, not verification of release 1.3.0. The hardening work
 uses L3 for deterministic intent mapping and L4 for semantic review. See
 [Verification](VERIFICATION.md) for current results.
 
+## Unreleased
+
+Security fixes from an adversarial review:
+
+- Parser denies comment-only input and globs in redirection targets.
+- Agent requires HTTP 200 and does not follow redirects with the API key.
+- UI returns 503 for malformed nested audit rows instead of a rendered error.
+- Forensic annotation keeps unsupported shell commands at high risk.
+- Added 172 adversarial regression cases.
+
 ## [1.3.0] - 2026-10-19
 
 Introduces the shadow-only System One observer, which records a local model's

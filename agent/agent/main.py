@@ -41,6 +41,18 @@ def get_auth_headers():
     return {"X-API-Key": API_KEY} if API_KEY else {}
 
 
+def call_guardian(method, path, *, timeout, **kwargs):
+    """Only HTTP 200 is an answer; never follow a redirect with the API key."""
+    response = requests.request(
+        method, f"{GUARDIAN_URL}{path}", allow_redirects=False, timeout=timeout, **kwargs
+    )
+    if response.status_code != 200:
+        raise requests.HTTPError(
+            f"Unexpected Guardian status {response.status_code}", response=response
+        )
+    return response
+
+
 def clean_command(text):
     if not isinstance(text, str):
         raise ValueError("Command generation returned a non-string")
@@ -124,10 +136,9 @@ def execute():
         if task_id is not None:
             if not isinstance(task_id, str) or len(task_id) > 64:
                 return jsonify({"error": "Invalid task_id"}), 400
-            response = requests.get(
-                f"{GUARDIAN_URL}/tasks/{task_id}", headers=get_auth_headers(), timeout=5
+            response = call_guardian(
+                "GET", f"/tasks/{task_id}", headers=get_auth_headers(), timeout=5
             )
-            response.raise_for_status()
             context = response.json()
             if not isinstance(context, dict) or context.get("trust") != "registered":
                 raise ValueError("Invalid trusted task context")
@@ -147,10 +158,9 @@ def execute():
         validation_body = {"command": command, "task": task, "llm_provider": LLM_PROVIDER}
         if task_id:
             validation_body["task_id"] = task_id
-        response = requests.post(
-            f"{GUARDIAN_URL}/validate", json=validation_body, headers=get_auth_headers(), timeout=5
+        response = call_guardian(
+            "POST", "/validate", json=validation_body, headers=get_auth_headers(), timeout=5
         )
-        response.raise_for_status()
         validation = response.json()
         if not isinstance(validation, dict) or type(validation.get("approved")) is not bool:
             raise ValueError("Invalid Guardian authorization response")
@@ -176,13 +186,13 @@ def execute():
                 "exit_code": 0,
             }
         try:
-            report = requests.post(
-                f"{GUARDIAN_URL}/report",
+            call_guardian(
+                "POST",
+                "/report",
                 json={"validation_id": validation_id, "command": command, "status": status},
                 headers=get_auth_headers(),
                 timeout=5,
             )
-            report.raise_for_status()
         except (requests.RequestException, ValueError):
             # An uncertain outcome must remain visible. Never repeat the command
             # automatically just because its post-execution report was lost.

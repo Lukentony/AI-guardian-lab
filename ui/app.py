@@ -170,18 +170,44 @@ def guardian_request(method, path, **kwargs):
         )
 
 
+def valid_audit_payload(data):
+    """Validate nested rows before Jinja renders them; malformed data is 503."""
+    if not isinstance(data, dict):
+        return None
+    stats = data.get("stats")
+    commands = data.get("commands")
+    if not isinstance(stats, dict) or not isinstance(commands, list):
+        return None
+    counters = ("total", "executed", "rejected")
+    if any(type(stats.get(name)) is not int or stats[name] < 0 for name in counters):
+        return None
+    rows = []
+    for row in commands:
+        if not isinstance(row, dict):
+            return None
+        clean = {}
+        for field in ("timestamp", "task", "command", "status"):
+            value = row.get(field)
+            if not isinstance(value, str):
+                return None
+            clean[field] = value
+        for field in ("llm_provider", "guardian_reason"):
+            value = row.get(field)
+            if value is not None and not isinstance(value, str):
+                return None
+            clean[field] = value or ""
+        rows.append(clean)
+    return {"stats": {name: stats[name] for name in counters}, "commands": rows}
+
+
 @app.route("/")
 def dashboard():
     try:
         response = guardian_request("GET", "/audit", timeout=5)
         if response.status_code != 200:
             return "Audit service unavailable", 503
-        data = response.json()
-        if (
-            not isinstance(data, dict)
-            or not isinstance(data.get("stats"), dict)
-            or not isinstance(data.get("commands"), list)
-        ):
+        data = valid_audit_payload(response.json())
+        if data is None:
             return "Invalid audit response", 503
         return render_template("dashboard.html", stats=data["stats"], commands=data["commands"])
     except (requests.RequestException, ValueError):

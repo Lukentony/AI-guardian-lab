@@ -53,8 +53,9 @@ def extract_binary(event: ForensicsEvent) -> str | None:
                 try:
                     parts = parse_commands(cmd.strip())
                 except UnsupportedShellError:
-                    # Unsupported shell semantics remain high risk; do not guess.
-                    return event.tool_name or "unknown_shell"
+                    # Unsupported shell semantics remain high risk; do not guess
+                    # a green zone from a tool name that hides the real command.
+                    return "<unsupported-shell>"
                 return max((part.binary for part in parts), key=lambda name: classify_zone(name)[1])
 
     # Fallback to tool_name if command key is missing

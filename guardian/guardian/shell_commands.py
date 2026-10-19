@@ -9,7 +9,6 @@ import os
 from dataclasses import dataclass
 
 import bashlex
-from bashlex.errors import ParsingError
 
 
 class UnsupportedShellError(ValueError):
@@ -44,11 +43,18 @@ def parse_commands(command: str) -> list[ShellCommand]:
         raise UnsupportedShellError("Multiline shell commands are not supported")
     try:
         trees = bashlex.parse(command)
-    except (ValueError, NotImplementedError, ParsingError) as exc:
+    except Exception as exc:  # untrusted parser input must fail closed
         raise UnsupportedShellError("Unsupported or malformed shell syntax") from exc
     result = []
 
+    def reject_globbing(start, end):
+        if any(character in command[start:end] for character in "*?["):
+            raise UnsupportedShellError("Shell globbing is not supported")
+
     def visit(node):
+        # bashlex can return a plain string for inputs such as a comment only.
+        if not hasattr(node, "kind"):
+            raise UnsupportedShellError("Malformed shell syntax")
         if node.kind in {"list", "pipeline"}:
             for part in node.parts:
                 if part.kind == "operator":
@@ -69,14 +75,14 @@ def parse_commands(command: str) -> list[ShellCommand]:
                         raise UnsupportedShellError("Shell expansions are not supported")
                     # bashlex leaves globbing to the shell: deny it rather than
                     # overlooking filenames/arguments introduced at execution time.
-                    if any(c in command[part.pos[0] : part.pos[1]] for c in "*?["):
-                        raise UnsupportedShellError("Shell globbing is not supported")
+                    reject_globbing(part.pos[0], part.pos[1])
                     words.append(part.word)
                 elif part.kind == "redirect":
                     if part.type not in {"<", ">", ">>"} or not hasattr(part.output, "word"):
                         raise UnsupportedShellError("Unsupported redirection")
                     if part.output.parts:
                         raise UnsupportedShellError("Redirection expansion is not supported")
+                    reject_globbing(part.output.pos[0], part.output.pos[1])
                     redirects.append((part.type, part.output.word))
                 else:
                     # Includes assignments (PATH/LD_PRELOAD), compound commands,

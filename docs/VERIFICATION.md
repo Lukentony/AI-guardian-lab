@@ -9,7 +9,7 @@ performed.
 
 | Check | Observed result |
 | --- | --- |
-| Complete offline pytest suite | **182 passed**, no skips or reported warnings |
+| Complete offline pytest suite | **354 passed** (182 baseline, 172 adversarial), no skips |
 | Application/scripts/tests Pyright | 0 errors, 0 warnings |
 | Separate model-service Pyright project | 0 errors, 0 warnings |
 | Ruff on changed runtime surfaces, including model service | Passed |
@@ -64,6 +64,22 @@ service environment. Its missing-import findings were recorded as environment
 false positives only after the dedicated Pyright project passed and subprocess
 startup resolved the local quarantine module. No inline diagnostic suppression
 was added to hide those imports.
+
+## Adversarial review (Sol 6.1)
+
+A separate review model attacked the release contract with source changes
+forbidden. It added 172 cases in `tests/test_adversarial_sol.py`. Ten failed on
+real defects, which were then fixed:
+
+- a comment-only command raised an uncaught parser error;
+- globs in redirection targets passed validation;
+- the Agent accepted HTTP 201, 202 and 302 as approval;
+- a 307 redirect made the Agent forward the API key to another origin;
+- malformed nested audit rows produced a 500 dashboard instead of 503;
+- unsupported forensic shell syntax was labelled green from the tool name.
+
+The full suite now passes with 354 tests. This review used only the offline
+harness; it did not prove sandbox behaviour, container effects or model accuracy.
 
 ## Container verification in a disposable VM
 
