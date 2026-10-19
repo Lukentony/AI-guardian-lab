@@ -104,8 +104,9 @@ The integration maintainer needs a compatible patched Kev release or another
 reviewed local backend. Its full dependency set must be resolved and audited
 before qualification is repeated. Keep the startup gate closed until that work
 passes; building an image is not enough. SecJev adoption or hosted inference needs its own
-license/privacy decision. The optional profile is never started by the installer;
-its image was not built locally because Docker was unavailable.
+license/privacy decision. The optional profile is never started by the installer.
+Its image build was checked in a disposable VM and stops at the qualification gate
+before installing the quarantined dependencies.
 
 ## Evaluation workflow
 

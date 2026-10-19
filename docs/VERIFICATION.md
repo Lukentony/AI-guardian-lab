@@ -1,8 +1,9 @@
 # Verification record: hardening and System One
 
-Scope: release candidate 1.3.0 on local branch `feature/system-one-hardening`,
-based on `15b6f6672a6a12546e25e795d66a91919c93f02f`. This is not a production approval.
-No GitHub publication, remote deployment or model-based enforcement was performed.
+Scope: release 1.3.0, published from branch `feature/system-one-hardening` and
+based on `15b6f6672a6a12546e25e795d66a91919c93f02f`. This is not a production
+approval. Model-based enforcement remains disabled and no remote deployment was
+performed.
 
 ## Executed checks
 
@@ -18,6 +19,9 @@ No GitHub publication, remote deployment or model-based enforcement was performe
 | Installed application-environment dependency audit | No known advisories reported |
 | Model dependency lock resolution, reinstall dry-run | Resolved 70 packages; no installation performed by that check |
 | Model service/bootstrap quarantine subprocess checks | Refused before model imports/downloads or socket startup |
+| Container build and startup in a disposable Ubuntu 24.04 VM | 3 images built; all services healthy |
+| UI authentication, audit API, chain verifier, restart persistence | Passed; details below |
+| GitHub Actions CI at 9f68090 | Completed successfully |
 
 The following checks ran from the repository root on the development machine,
 in the coding session's own process:
@@ -52,13 +56,45 @@ Installer tests mock Docker/Ollama/curl and inspect private generated configurat
 consistent model names, simulation defaults, Compose build use and preservation of
 an existing `.env`. Static Compose checks inspect contexts, COPY sources, health
 commands, loopback exposure, private model profile and workspace mount syntax.
-These checks **do not** prove actual container startup or filesystem ownership.
+Those static checks do not prove container startup by themselves; the VM run
+below covers that part.
 
 The home-workspace language-server probe did not consistently resolve the separate
 service environment. Its missing-import findings were recorded as environment
 false positives only after the dedicated Pyright project passed and subprocess
 startup resolved the local quarantine module. No inline diagnostic suppression
 was added to hide those imports.
+
+## Container verification in a disposable VM
+
+The development host has no Docker installation, so the published commit
+`9f68090` was cloned inside a disposable Ubuntu 24.04 cloud VM with KVM
+acceleration, 4 vCPU, 6 GiB RAM and a 24 GiB overlay disk. Test credentials were
+generated inside the VM; no real secrets or workspaces were used.
+
+Observed:
+
+- Docker 29.1.3 and Compose 2.40.3.
+- `guardian`, `agent` and `ui` built from the documented contexts.
+- `docker compose up -d --build --wait` reached healthy for all three services.
+- Containers ran as `1000:1000`. Limits applied: 512 MiB and 0.5 CPU for
+  Guardian, 1 GiB and 0.75 CPU for Agent, 256 MiB and 0.25 CPU for UI.
+- Published ports listened on `127.0.0.1` only.
+- Health returned 200 on 5000, 5001 and 8081. The UI root returned 401 without
+  credentials and 200 with them, showing audit rows retrieved through Guardian.
+- `/validate` approved `ls /tmp` through mapping. System One was unavailable with
+  a connection error in 3.21 ms and the decision stayed unchanged. A chain ending
+  in `curl` was rejected by mapping.
+- `scripts/verify_logs.py` reported a valid chain, 2 signed rows, 0 unsigned
+  legacy rows and no errors.
+- `/report` returned 200, an identical repeat 200, and a conflicting command 409.
+- After a Guardian restart the audit rows persisted.
+- The optional `system-one` profile build stopped at the qualification gate with
+  the documented reason, before installing dependencies.
+
+Not measured: load behavior, long-running stability, real command execution and
+model inference. The VM and its disk were stopped and retained outside the
+repository.
 
 ## Dependency audit and explicit exclusions
 
@@ -106,11 +142,12 @@ repeat evaluation. The recorded local runtime is no longer permitted to start.
 
 | Blocker/limit | Practical next step | Owner |
 | --- | --- | --- |
-| Docker unavailable locally | On an authorized Docker-equipped test host, run the prepared ordinary-service Compose smoke workflow; verify image startup, UID/GID ownership, authenticated UI/API and persistent recovery | Deployment/test owner |
+| Target-host deployment | Repeat the smoke check on the intended host, then verify backups, UID/GID ownership and recovery there | Deployment owner |
 | Kev/PyTorch security incompatibility | Obtain a compatible patched upstream release or choose another licensed/privacy-reviewed backend; audit, test and requalify before clearing the startup gate | Integration maintainer, with upstream dependency support |
 | CPU latency and unreliable scores | Benchmark the reviewed replacement/hardware on independent labelled calibration and untouched held-out workloads; do not loosen thresholds merely to pass | Evaluation owner |
 | No production sandbox or durable exactly-once executor | Supply and verify OS-level isolation and recovery semantics before any real untrusted execution | Deployment/security owner |
 
-The GitHub workflow now pins actions by commit and includes ordinary-service
-Compose smoke checks. It has not run for this unpublished revision. Publishing
-or deploying the branch still requires approval.
+The GitHub workflow pins actions by commit and includes ordinary-service Compose
+smoke checks. It completed successfully at `9f68090`, so the container check ran
+independently on GitHub runners as well. It cannot verify model inference, and a
+target host still needs its own deployment check.

@@ -19,7 +19,8 @@ calibration case and after a PyTorch advisory and compatibility conflict.
 - Unified audit storage and signing, repaired forensic argument handling, and
   made pattern promotion an operator action.
 - Repaired installation and UI access.
-- Quarantined the CPU model candidate. Container verification remains pending.
+- Quarantined the CPU model candidate. Container build and startup were verified
+  in a disposable VM and by CI.
 
 ## [1.2.0] - 2026-03-06
 

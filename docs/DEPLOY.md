@@ -22,9 +22,10 @@ to work around a failed startup. Inspect the error and correct its cause.
 
 ## Verification and recovery
 
-The ordinary-service smoke workflow is prepared, but Docker was unavailable for
-local verification. Image startup, volume permissions and recovery still need to
-be checked on a Docker-equipped test host before deployment.
+The ordinary-service stack was built and started in a disposable Ubuntu 24.04 VM
+with Docker 29.1.3 and Compose 2.40.3. All health checks passed, the UI returned
+401 without credentials, the audit chain verified and state survived a restart.
+A target-host check is still required before deployment.
 
 [Verification](VERIFICATION.md) records what has actually passed.
 [Architecture](../ARCHITETTURA.md) describes network boundaries and recovery limits.

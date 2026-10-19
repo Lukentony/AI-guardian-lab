@@ -111,9 +111,10 @@ them before they become policy.
 
 ## Checks and remaining work
 
-[Verification](docs/VERIFICATION.md) records the passing tests and dependency
-audit, the failed CPU experiment and the Docker checks still to run. Synthetic
-fixtures cover regressions; they do not measure real-world detection accuracy.
+[Verification](docs/VERIFICATION.md) records the passing tests, the dependency
+audit, the failed CPU experiment and the container checks run in a disposable
+Ubuntu 24.04 VM. GitHub CI also passed at the release commit. Synthetic fixtures
+cover regressions; they do not measure real-world detection accuracy.
 
 Every executor needs a pre-execution hook. Asking a model to call Guardian is not
 enforcement. The task policy is not a complete filesystem or network sandbox,

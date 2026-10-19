@@ -20,8 +20,9 @@ and a matching workspace.
 
 Compose configures non-root processes, resource limits and loopback-only host
 ports. The UI requires Basic authentication and retrieves audit data through
-Guardian; it does not mount SQLite. These settings still need Docker verification
-on the target host and do not amount to a production sandbox.
+Guardian; it does not mount SQLite. These settings were exercised in a
+disposable VM and do not amount to a production sandbox. A target-host check
+remains separate.
 
 Regex searches have a 50 ms engine timeout. Timeout or invalid pattern state
 denies validation. Audit records use a transactional HMAC chain; redaction is

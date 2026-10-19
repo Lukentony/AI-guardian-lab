@@ -126,9 +126,9 @@ ownership of bind-mounted state directories.
 
 See [installation](docs/INSTALL.md), [API](docs/API.md),
 [System One qualification](docs/SYSTEM_ONE.md) and
-[verification](docs/VERIFICATION.md). The CI workflow defines offline regression
-and Compose smoke tests without routine model-weight downloads. It has not run
-for this unpublished branch.
+[verification](docs/VERIFICATION.md). The CI workflow runs offline regression
+and Compose smoke tests without routine model-weight downloads; it passed at the
+1.3.0 release commit.
 
 The current CPU candidate failed the observer's 500 ms latency budget in local
 calibration. Its PyTorch dependency also conflicts with security updates.
