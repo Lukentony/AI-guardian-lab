@@ -15,7 +15,7 @@ AI agents can run shell commands on your machine. Guardian decides which ones ac
 
 AI agent frameworks often provide LLMs with direct shell access to complete tasks. In most implementations, security relies entirely on the model's willingness to follow system instructions. But model compliance is not the same thing as security enforcement.
 
-## Quick Start (for Juniors) 🚀
+## Quick Start 🚀
 
 Experience the protection in 60 seconds:
 
@@ -26,7 +26,7 @@ Watch as Guardian intercepts obfuscated payloads and intent-conflicting commands
 
 ---
 
-## Defense Pipeline (for Seniors) 🛡️
+## Defense Pipeline 🛡️
 
 Guardian implements a deterministic, multi-layered security middleware. It does **not** rely solely on LLM "good behavior."
 
