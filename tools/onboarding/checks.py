@@ -89,9 +89,10 @@ def compose_up(
     build: bool = True,
     timeout: int = 900,
 ) -> int:
-    args = ["up", "-d", "--wait", "--wait-timeout", "600"]
+    args = ["up"]
     if build:
-        args.insert(0, "--build")
+        args.append("--build")
+    args.extend(["-d", "--wait", "--wait-timeout", "600"])
     command = compose_command(root, env_file, compose_file, args)
     print("+ " + " ".join(command))
     try:
