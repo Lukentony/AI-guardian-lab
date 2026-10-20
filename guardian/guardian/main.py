@@ -342,7 +342,7 @@ def audit_view():
             "SELECT COUNT(*) FROM command_log WHERE status='rejected'"
         ).fetchone()[0]
         rows = connection.execute(
-            "SELECT timestamp,task,command,status,llm_provider,guardian_reason FROM command_log ORDER BY id DESC LIMIT 20"
+            "SELECT timestamp,task,command,status,llm_provider,guardian_reason,intent_source FROM command_log ORDER BY id DESC LIMIT 20"
         ).fetchall()
     except sqlite3.Error:
         return jsonify({"error": "Audit unavailable"}), 503

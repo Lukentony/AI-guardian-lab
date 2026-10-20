@@ -1,8 +1,15 @@
 # Roadmap
 
-Version 1.4 adds a first-run CLI, a deterministic demo and release images. It
+Version 1.5 rebuilds the browser interface around the decision trail. It
 remains a research lab. See [Verification](VERIFICATION.md) for measured results
 rather than treating this roadmap as a completion record.
+
+## Completed in 1.5
+
+- Dashboard with summary metrics, search, status filtering and source badges.
+- Deterministic demo page and endpoint, with no execution path.
+- Read-only status page for Guardian, Agent and the audit API.
+- Restyled forensics report with visible incomplete-analysis state.
 
 ## Completed in 1.4
 

@@ -1,6 +1,6 @@
 services:
   guardian:
-    image: ghcr.io/lukentony/ai-guardian-lab-guardian:${IMAGE_TAG:-1.4.0}
+    image: ghcr.io/lukentony/ai-guardian-lab-guardian:${IMAGE_TAG:-1.5.0}
     user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
     ports:
       - "${GUARDIAN_BIND_IP:-127.0.0.1}:${GUARDIAN_PORT:-5000}:5000"
@@ -45,7 +45,7 @@ services:
       retries: 3
 
   agent:
-    image: ghcr.io/lukentony/ai-guardian-lab-agent:${IMAGE_TAG:-1.4.0}
+    image: ghcr.io/lukentony/ai-guardian-lab-agent:${IMAGE_TAG:-1.5.0}
     user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
     ports:
       - "127.0.0.1:${AGENT_PORT:-5001}:5001"
@@ -92,7 +92,7 @@ services:
         condition: service_healthy
 
   ui:
-    image: ghcr.io/lukentony/ai-guardian-lab-ui:${IMAGE_TAG:-1.4.0}
+    image: ghcr.io/lukentony/ai-guardian-lab-ui:${IMAGE_TAG:-1.5.0}
     user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
     ports:
       - "127.0.0.1:${UI_PORT:-8081}:8080"
@@ -100,6 +100,8 @@ services:
     environment:
       GUARDIAN_URL: http://guardian:5000
       GUARDIAN_API_KEY: ${API_KEY:?Set API_KEY in .env}
+      AGENT_URL: http://agent:5001
+      APP_VERSION: ${IMAGE_TAG:-1.5.0}
       UI_USERNAME: ${UI_USERNAME:-guardian}
       UI_PASSWORD: ${UI_PASSWORD:?Set UI_PASSWORD in .env}
     security_opt: ["no-new-privileges:true"]

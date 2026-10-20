@@ -102,6 +102,8 @@ services:
     environment:
       GUARDIAN_URL: http://guardian:5000
       GUARDIAN_API_KEY: ${API_KEY:?Set API_KEY in .env}
+      AGENT_URL: http://agent:5001
+      APP_VERSION: ${IMAGE_TAG:-1.5.0}
       UI_USERNAME: ${UI_USERNAME:-guardian}
       UI_PASSWORD: ${UI_PASSWORD:?Set UI_PASSWORD in .env}
     security_opt: ["no-new-privileges:true"]

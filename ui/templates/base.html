@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <title>{% block title %}AI Guardian Lab{% endblock %}</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+        <div class="shell header-inner">
+            <a class="brand" href="/" aria-label="AI Guardian Lab home">
+                <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+                    <path d="M20 4 33 9v9c0 8-5.2 13.8-13 16.8C12.2 31.8 7 26 7 18V9l13-5Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>
+                    <path d="m13.5 19.5 4.2 4.2 8.8-9.4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span class="brand-copy">
+                    <span class="brand-name">AI Guardian Lab</span>
+                    <span class="brand-tag">command authorization</span>
+                </span>
+            </a>
+            <nav class="nav" aria-label="Primary">
+                {% set here = request.path %}
+                {% if here == '/' %}
+                <a href="/" class="active" aria-current="page">Dashboard</a>
+                {% else %}
+                <a href="/">Dashboard</a>
+                {% endif %}
+                {% if here.startswith('/demo') %}
+                <a href="/demo" class="active" aria-current="page">Demo</a>
+                {% else %}
+                <a href="/demo">Demo</a>
+                {% endif %}
+                {% if here.startswith('/forensics') %}
+                <a href="/forensics" class="active" aria-current="page">Forensics</a>
+                {% else %}
+                <a href="/forensics">Forensics</a>
+                {% endif %}
+                {% if here.startswith('/status') %}
+                <a href="/status" class="active" aria-current="page">Status</a>
+                {% else %}
+                <a href="/status">Status</a>
+                {% endif %}
+            </nav>
+            <div class="header-meta">
+                <span class="version">v{{ app_version }}</span>
+            </div>
+        </div>
+    </header>
+
+    <main id="main" class="shell main">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <div class="shell footer-inner">
+            <span>Research software. Real execution is disabled by default.</span>
+            <span>Loopback only. No database mount.</span>
+        </div>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

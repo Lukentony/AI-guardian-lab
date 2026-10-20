@@ -26,7 +26,7 @@ rm -rf "$stage" "$archive" "$archive.sha256"
 mkdir -p "$stage/state/audit" "$stage/state/learned"
 
 cp "$root/docker-compose.release.yml" "$stage/docker-compose.yml"
-sed -i "s/IMAGE_TAG:-1.4.0/IMAGE_TAG:-$version/g" "$stage/docker-compose.yml"
+sed -i -E "s/IMAGE_TAG:-[0-9]+\.[0-9]+\.[0-9]+/IMAGE_TAG:-$version/g" "$stage/docker-compose.yml"
 cp "$root/guardian-lab" "$stage/guardian-lab"
 chmod +x "$stage/guardian-lab"
 cp -R "$root/tools" "$stage/tools"

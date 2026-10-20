@@ -1,6 +1,6 @@
 # AI Guardian Lab
 
-![Version](https://img.shields.io/badge/version-1.4.0-blue)
+![Version](https://img.shields.io/badge/version-1.5.0-blue)
 ![Status](https://img.shields.io/badge/status-experimental-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -26,9 +26,27 @@ repository and run the same commands:
 The demo validates five fixed commands and never executes them. It prints the
 expected and actual decision, appends five signed audit records and checks that
 the UI rejects anonymous access. Open `http://127.0.0.1:8081` and use the
-credentials in `.env`. Release images are published for `linux/amd64`; a
-checkout builds locally on first run. See [Onboarding](docs/ONBOARDING.md) for the
-archive checksum, profiles, support matrix and troubleshooting.
+credentials in `.env`. The dashboard links to the same demo, to a read-only
+status page and to the forensics view. Release images are published for
+`linux/amd64`; a checkout builds locally on first run. See
+[Onboarding](docs/ONBOARDING.md) for the archive checksum, profiles, support
+matrix and troubleshooting.
+
+## What 1.5 adds
+
+The browser interface is rebuilt around the decisions, not around the database:
+
+- A dashboard with summary metrics, search, status filtering, source badges and
+  truncated task or reason text with the full value on hover.
+- A deterministic demo page and endpoint. It runs the same five cases as the CLI,
+  writes five signed records, applies a short cooldown and never executes a
+  command.
+- A read-only status page for Guardian, Agent and the audit API. It does not
+  inspect Docker, the model service or the signing key.
+- A cleaner forensics report with a prominent incomplete-analysis state.
+- A self-contained stylesheet and icons, with no CDN or external font.
+
+The UI still has no execution path, no Docker socket and no database mount.
 
 ## What 1.4 adds
 

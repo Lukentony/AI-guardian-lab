@@ -43,11 +43,16 @@ class DemoResult:
 
 
 CASES = (
-    DemoCase("allowed listing", "ls /tmp", "List files in the temporary directory", True),
-    DemoCase("red-zone binary", "rm LICENSE", "Read the license file", False),
-    DemoCase("undeclared write", "cat README.md > /tmp/readme-copy", "Read the project notes", False),
-    DemoCase("glob in redirect", "echo ok > /tmp/?", "Write a status file", False),
-    DemoCase("comment-only input", "# comment only", "List files", False),
+    DemoCase("Allowed listing", "ls /tmp", "List files in the temporary directory", True),
+    DemoCase("Red-zone binary", "rm LICENSE", "Read the license file", False),
+    DemoCase(
+        "Undeclared write",
+        "cat README.md > /tmp/readme-copy",
+        "Read the project notes",
+        False,
+    ),
+    DemoCase("Glob in redirect", "echo ok > /tmp/?", "Write a status file", False),
+    DemoCase("Comment-only input", "# comment only", "List files", False),
 )
 
 

@@ -1,88 +1,129 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Guardian Lab - Dashboard</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', sans-serif; background: #1a1a2e; color: #eee; padding: 20px; }
-        .container { max-width: 1400px; margin: 0 auto; }
-        h1 { font-size: 2em; margin-bottom: 30px; color: #16c79a; }
-
-        .nav { display: flex; gap: 10px; margin-bottom: 30px; border-bottom: 2px solid #0f3460; padding-bottom: 10px; }
-        .nav a { color: #aaa; text-decoration: none; padding: 8px 20px; border-radius: 8px; font-weight: 600; transition: 0.3s; }
-        .nav a:hover { background: #16213e; color: #16c79a; }
-        .nav a.active { background: #16c79a; color: #1a1a2e; }
-
-        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 40px; }
-        .stat-card { background: #16213e; padding: 25px; border-radius: 12px; text-align: center; border: 2px solid #0f3460; }
-        .stat-card h2 { font-size: 3em; margin-bottom: 10px; }
-        .stat-card.total h2 { color: #16c79a; }
-        .stat-card.executed h2 { color: #4ecdc4; }
-        .stat-card.rejected h2 { color: #ff6b6b; }
-        .stat-card p { font-size: 1.1em; color: #aaa; }
-
-        table { width: 100%; background: #16213e; border-radius: 12px; overflow: hidden; border-collapse: collapse; }
-        th { background: #0f3460; padding: 15px; text-align: left; color: #16c79a; font-weight: 600; }
-        td { padding: 12px 15px; border-bottom: 1px solid #0f3460; }
-        tr:hover { background: #1a2942; }
-        .status { padding: 5px 12px; border-radius: 20px; font-size: 0.85em; font-weight: 600; }
-        .status.executed { background: #4ecdc4; color: #000; }
-        .status.rejected { background: #ff6b6b; color: #fff; }
-        .command { font-family: 'Courier New', monospace; font-size: 0.9em; color: #ffd700; }
-        .reason { color: #ff6b6b; font-size: 0.85em; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🛡️ AI Guardian Lab Dashboard</h1>
-
-        <div class="nav">
-            <a href="/" class="active">Dashboard</a>
-            <a href="/forensics">Forensics</a>
-        </div>
-
-        <div class="stats">
-            <div class="stat-card total">
-                <h2>{{ stats.total }}</h2>
-                <p>Total Commands</p>
-            </div>
-            <div class="stat-card executed">
-                <h2>{{ stats.executed }}</h2>
-                <p>Executed</p>
-            </div>
-            <div class="stat-card rejected">
-                <h2>{{ stats.rejected }}</h2>
-                <p>Blocked</p>
-            </div>
-        </div>
-
-        <h2 style="margin-bottom: 20px; color: #16c79a;">📜 Recent Commands (Last 20)</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Timestamp</th>
-                    <th>Task</th>
-                    <th>Command</th>
-                    <th>Status</th>
-                    <th>LLM</th>
-                    <th>Reason</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for cmd in commands %}
-                <tr>
-                    <td>{{ cmd.timestamp }}</td>
-                    <td>{{ cmd.task[:50] }}</td>
-                    <td class="command">{{ cmd.command[:60] }}</td>
-                    <td><span class="status {{ cmd.status }}">{{ cmd.status }}</span></td>
-                    <td>{{ cmd.llm_provider }}</td>
-                    <td class="reason">{{ cmd.guardian_reason[:40] if cmd.guardian_reason else '-' }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+{% extends "base.html" %}
+{% block title %}Dashboard · AI Guardian Lab{% endblock %}
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Overview</p>
+        <h1>Every command, checked before it runs.</h1>
+        <p class="lede">Guardian compares the proposed shell command with the declared task, applies policy and records a signed decision. This view is read-only.</p>
     </div>
-</body>
-</html>
+    <div class="actions">
+        <a class="btn btn-primary" href="/demo">Run the demo</a>
+        <a class="btn" href="/status">System status</a>
+    </div>
+</section>
+
+<section class="metric-grid" aria-label="Audit summary">
+    <article class="metric accent">
+        <div class="metric-label">Decisions</div>
+        <div class="metric-value">{{ stats.total }}</div>
+        <div class="metric-hint">Signed audit records</div>
+    </article>
+    <article class="metric ok">
+        <div class="metric-label">Approved</div>
+        <div class="metric-value">{{ stats.total - stats.rejected }}</div>
+        <div class="metric-hint">Not blocked by policy</div>
+    </article>
+    <article class="metric danger">
+        <div class="metric-label">Blocked</div>
+        <div class="metric-value">{{ stats.rejected }}</div>
+        <div class="metric-hint">Parser, policy or intent</div>
+    </article>
+    <article class="metric">
+        <div class="metric-label">Executed</div>
+        <div class="metric-value">{{ stats.executed }}</div>
+        <div class="metric-hint">Terminal outcomes reported</div>
+    </article>
+</section>
+
+<div class="content-grid">
+    <section class="panel" aria-labelledby="recent-title">
+        <header class="panel-head">
+            <div>
+                <h2 id="recent-title">Recent decisions</h2>
+                <p>Last {{ commands|length }} records, newest first.</p>
+            </div>
+            <div class="toolbar">
+                <label class="sr-only" for="decision-search">Search decisions</label>
+                <input class="input" id="decision-search" type="search" placeholder="Search task or command" autocomplete="off">
+                <label class="sr-only" for="decision-status">Filter by status</label>
+                <select class="select" id="decision-status">
+                    <option value="">All statuses</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Blocked</option>
+                    <option value="simulated">Simulated</option>
+                    <option value="executed">Executed</option>
+                </select>
+            </div>
+        </header>
+
+        {% if commands %}
+        <div class="table-wrap">
+            <table class="data-table decisions-table" id="decision-table">
+                <caption class="sr-only">Recent command decisions</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Time</th>
+                        <th scope="col">Task</th>
+                        <th scope="col">Command</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Source</th>
+                        <th scope="col">Reason</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cmd in commands %}
+                    {% set tone = 'ok' if cmd.status in ('approved', 'simulated', 'executed') else 'block' %}
+                    <tr data-status="{{ cmd.status }}" data-search="{{ (cmd.task ~ ' ' ~ cmd.command ~ ' ' ~ cmd.status ~ ' ' ~ cmd.intent_source ~ ' ' ~ cmd.llm_provider ~ ' ' ~ cmd.guardian_reason)|lower }}">
+                        <td class="cell-time"><time datetime="{{ cmd.timestamp }}" title="{{ cmd.timestamp }}">{{ cmd.timestamp|short_time }}</time></td>
+                        <td class="cell-task" title="{{ cmd.task }}">{{ cmd.task }}</td>
+                        <td><code class="command">{{ cmd.command }}</code></td>
+                        <td><span class="chip chip-{{ tone }}">{{ cmd.status }}</span></td>
+                        <td><span class="chip chip-source">{{ cmd.intent_source or cmd.llm_provider or 'local' }}</span></td>
+                        <td class="cell-reason" title="{{ cmd.guardian_reason }}">{{ cmd.guardian_reason or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="empty" id="empty-filter" hidden><strong>No matching decisions.</strong> Change the search or the status filter.</p>
+        {% else %}
+        <div class="empty">
+            <strong>No decisions yet.</strong>
+            Run the deterministic demo to create the first five records.
+        </div>
+        {% endif %}
+    </section>
+
+    <aside class="side-stack">
+        <section class="panel" aria-labelledby="chain-title">
+            <h2 id="chain-title">Audit integrity</h2>
+            <p class="muted">Decisions are appended to a transactional HMAC chain. The UI reads them through Guardian and has no database mount.</p>
+            <dl class="facts">
+                <div>
+                    <dt>Signing</dt>
+                    <dd>HMAC-SHA256</dd>
+                </div>
+                <div>
+                    <dt>Records</dt>
+                    <dd>{{ stats.total }}</dd>
+                </div>
+                <div>
+                    <dt>Verify</dt>
+                    <dd>guardian-lab doctor</dd>
+                </div>
+            </dl>
+            <a class="text-link" href="/status">Inspect the stack</a>
+        </section>
+
+        <section class="panel" aria-labelledby="demo-title">
+            <h2 id="demo-title">Try it safely</h2>
+            <p class="muted">The demo sends five fixed commands to Guardian. Nothing is executed, and no model is required.</p>
+            <a class="btn btn-primary" href="/demo">Open the demo</a>
+        </section>
+    </aside>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='dashboard.js') }}" defer></script>
+{% endblock %}
