@@ -24,6 +24,7 @@ performed.
 | UI authentication, audit API, chain verifier, restart persistence | Passed; details below |
 | GitHub Actions CI at 9f68090 (1.3.1) | Completed successfully |
 | GitHub Actions CI at 80a5325 (PR #4) | Test and onboarding jobs passed |
+| GitHub Actions CI at 8333c01 (PR #5) | Test and onboarding jobs passed |
 
 The following checks ran from the repository root on the development machine,
 in the coding session's own process:
@@ -119,6 +120,8 @@ headless Chromium.
   framework is used.
 - No visual-regression tool was used; the review is manual and does not replace a
   usability test with external users.
+- GitHub Actions CI passed on PR #5 at `8333c01`, including the onboarding job
+  that builds the new UI image.
 
 ## Adversarial review (Sol 6.1)
 
