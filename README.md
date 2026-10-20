@@ -36,7 +36,7 @@ matrix and troubleshooting.
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
-The dashboard after the five-case demo: signed decisions, source badges and the
+The dashboard after the deterministic demo: signed decisions, source badges and the
 audit summary. Search and status filters run locally; this view never executes a
 command.
 
