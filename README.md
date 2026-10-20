@@ -32,6 +32,20 @@ status page and to the forensics view. Release images are published for
 [Onboarding](docs/ONBOARDING.md) for the archive checksum, profiles, support
 matrix and troubleshooting.
 
+## Interface
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+The dashboard after the five-case demo: signed decisions, source badges and the
+audit summary. Search and status filters run locally; this view never executes a
+command.
+
+![Deterministic demo](docs/screenshots/demo.png)
+
+The demo page runs the same five cases as the CLI, shows the expected and actual
+decision, and reports the audit delta. No model is required. The same build also
+includes a read-only status page and the forensics report.
+
 ## What 1.5 adds
 
 The browser interface is rebuilt around the decisions, not around the database:

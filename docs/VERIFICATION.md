@@ -25,6 +25,8 @@ performed.
 | GitHub Actions CI at 9f68090 (1.3.1) | Completed successfully |
 | GitHub Actions CI at 80a5325 (PR #4) | Test and onboarding jobs passed |
 | GitHub Actions CI at 8333c01 (PR #5) | Test and onboarding jobs passed |
+| GitHub Actions CI at 995a1eb (main) | Passed |
+| Release workflow v1.5.0 | Test, three images and bundle passed |
 
 The following checks ran from the repository root on the development machine,
 in the coding session's own process:
@@ -122,6 +124,23 @@ headless Chromium.
   usability test with external users.
 - GitHub Actions CI passed on PR #5 at `8333c01`, including the onboarding job
   that builds the new UI image.
+
+## 1.5.0 release archive verification
+
+The published archive was downloaded in the disposable Ubuntu 24.04 VM and run
+with the published images:
+
+- the outer SHA-256 and the internal `SHA256SUMS` both verified;
+- `setup` and `demo` pulled the 1.5.0 images and returned 5/5, +5 audit rows and
+  a valid 5-row chain;
+- `/`, `/demo`, `/status`, `/forensics` and `/static/app.css` returned 200 with
+  Basic authentication and displayed `v1.5.0`;
+- the UI demo endpoint returned 5/5 and +5 audit rows; `doctor` then reported 10
+  signed rows;
+- containers ran as `1000:1000` with loopback-only ports.
+
+This check used the published archive, not the source checkout. It did not run
+real commands, model inference or a browser accessibility audit.
 
 ## Adversarial review (Sol 6.1)
 
