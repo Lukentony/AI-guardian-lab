@@ -101,6 +101,21 @@ def test_summary_assembly_no_flags():
     report = generate_report(behavior_report, ann_session)
     assert "No anomalies detected." in report.summary
 
+def test_incomplete_analysis_is_not_reported_as_clean():
+    ann_session, behavior_report = create_mock_behavior_data()
+    behavior_report.escalation = AnalysisFlag(False, "none", "")
+    behavior_report.intent_drift = AnalysisFlag(False, "low", "LLM analysis failed", evaluated=False)
+    behavior_report.injection_signals = AnalysisFlag(False, "none", "")
+
+    report = generate_report(behavior_report, ann_session)
+
+    assert report.analysis_complete is False
+    assert "Analysis incomplete" in report.summary
+    assert "No anomalies detected" not in report.summary
+    assert report.to_dict()["analysis_complete"] is False
+    assert report.to_dict()["flags"]["intent_drift"]["evaluated"] is False
+    assert "INCOMPLETE" in report.to_text()
+
 def test_timeline_filtering():
     # Ensure only tool_call events are in the timeline
     events = [

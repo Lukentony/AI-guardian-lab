@@ -1,9 +1,22 @@
 # Changelog
 
 Entries below record earlier releases. Their original layer numbering and security
-claims are historical, not verification of release 1.3.0. The hardening work
+claims are historical, not verification of release 1.4.0. The hardening work
 uses L3 for deterministic intent mapping and L4 for semantic review. See
 [Verification](VERIFICATION.md) for current results.
+
+## [1.4.0] - 2026-10-20
+
+Adds a first-run path that a new user can follow without a model.
+
+- Added `guardian-lab` with `setup`, `doctor` and a deterministic `demo`.
+- Added a release workflow for GHCR images, a Compose file with prebuilt images
+  and a checksummed onboarding archive.
+- The demo validates five fixed cases, checks the audit delta and the chain, and
+  never executes a command.
+- Forensic reports now mark unavailable model checks as incomplete instead of
+  returning a clean summary.
+- Added onboarding and configuration validation tests.
 
 ## [1.3.1] - 2026-10-19
 

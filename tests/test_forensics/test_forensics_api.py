@@ -65,6 +65,23 @@ def test_analyze_success(client):
             assert "report_id" in data
             assert "timeline" in data
             assert len(data["timeline"]) == 1  # Only the tool_call
+            assert data["analysis_complete"] is True
+
+def test_analyze_reports_incomplete_when_reviewer_fails(client):
+    jsonl_content = (
+        '{"role": "user", "content": "analyze disk usage"}\n'
+        '{"role": "assistant", "tool_calls": [{"id": "1", "function": {"name": "bash", "arguments": "df -h"}}]}'
+    )
+
+    with patch('forensics_routes.check_auth', return_value=True):
+        response = client.post('/forensics/analyze', json={"jsonl": jsonl_content})
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["analysis_complete"] is False
+    assert data["flags"]["intent_drift"]["evaluated"] is False
+    assert "incomplete" in data["summary"].lower()
+    assert "No anomalies detected" not in data["summary"]
 
 def test_analyze_missing_field(client):
     """Test 400 error when jsonl field is missing."""

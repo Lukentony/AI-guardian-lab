@@ -117,6 +117,16 @@ def test_llm_failure_handling(mock_chat):
     assert report.intent_drift.confidence == "low"
     assert "failed" in report.intent_drift.reason
 
+@patch("guardian.forensics.analyzer._ollama_chat")
+def test_llm_failure_marks_analysis_incomplete(mock_chat):
+    mock_chat.return_value = None
+    session = create_mock_session([1], initial_task="List files")
+    report = analyze_session(session)
+
+    assert report.intent_drift.evaluated is False
+    assert "incomplete" in report.summary.lower()
+    assert "No significant" not in report.summary
+
 def test_anomaly_score_calculation():
     # Mocking analyze_escalation, analyze_intent_drift, analyze_injection_signals
     # to test the score aggregation logic

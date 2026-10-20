@@ -101,6 +101,46 @@ def test_ui_handles_unavailable_or_malformed_audit(monkeypatch, requests_mock, s
         assert client.get("/", headers=headers).status_code == 503
 
 
+def test_ui_surfaces_incomplete_forensics(monkeypatch, requests_mock):
+    import base64
+
+    monkeypatch.setenv("UI_PASSWORD", "ui-test-password")
+    requests_mock.post(
+        f"{ui.GUARDIAN_API}/forensics/analyze",
+        json={
+            "report_id": "r1",
+            "session_id": "s1",
+            "anomaly_score": 0,
+            "event_count": 1,
+            "tool_call_count": 0,
+            "summary": "Analysis incomplete: the reviewer did not answer.",
+            "analysis_complete": False,
+            "flags": {
+                "escalation": {"triggered": False, "confidence": "none", "reason": "", "evaluated": True},
+                "intent_drift": {
+                    "triggered": False,
+                    "confidence": "low",
+                    "reason": "LLM analysis failed",
+                    "evaluated": False,
+                },
+                "injection_signals": {"triggered": False, "confidence": "none", "reason": "", "evaluated": True},
+            },
+            "timeline": [],
+        },
+    )
+    headers = {"Authorization": "Basic " + base64.b64encode(b"guardian:ui-test-password").decode()}
+    with ui.app.test_client() as client:
+        response = client.post(
+            "/forensics",
+            headers=headers,
+            data={"jsonl_content": '{"role": "user", "content": "inspect"}'},
+        )
+
+    assert response.status_code == 200
+    assert b"Incomplete analysis" in response.data
+    assert b"UNAVAILABLE" in response.data
+
+
 def test_ui_does_not_follow_backend_redirects(monkeypatch, requests_mock):
     import base64
 

@@ -22,15 +22,15 @@ jobs:
       - name: Offline regression suite
         run: python -m pytest --junitxml=test-results.xml
       - name: Type checks
-        run: pyright guardian database agent ui scripts tests
+        run: pyright guardian database agent ui scripts tests tools
       - name: Lint changed runtime surfaces
         run: >-
-          ruff check guardian database agent ui
+          ruff check guardian database agent ui tools
           scripts/evaluate_system_one.py scripts/pattern_learner.py
           scripts/verify_logs.py
       - name: Shell syntax
         run: |
-          bash -n install.sh
+          bash -n install.sh scripts/package_release.sh
           sh -n guardian/entrypoint.sh system-one/bootstrap.sh
           sh -n scripts/validate_config.sh
       - name: Upload test results
@@ -65,3 +65,26 @@ jobs:
         env:
           API_KEY: ci-agent-key
           UI_PASSWORD: ci-ui-password
+
+  onboarding:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+      - name: Create the demo configuration
+        run: ./guardian-lab setup --profile demo --no-start
+      - name: Start the stack
+        run: docker compose up -d --build --wait --wait-timeout 300
+      - name: Diagnose
+        run: ./guardian-lab doctor
+      - name: Run the deterministic demo
+        run: ./guardian-lab demo --no-start
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs --tail=100
+      - name: Stop onboarding containers
+        if: always()
+        run: docker compose down

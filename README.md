@@ -1,6 +1,6 @@
 # AI Guardian Lab
 
-![Version](https://img.shields.io/badge/version-1.3.1-blue)
+![Version](https://img.shields.io/badge/version-1.4.0-blue)
 ![Status](https://img.shields.io/badge/status-experimental-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -11,6 +11,32 @@ The agent then simulates the action or, when explicitly enabled, executes it.
 > **Research software.** Real execution is disabled by default. Enabling it runs
 > `/bin/bash -c` without a complete OS-level sandbox. Do not give the executor
 > sensitive workspaces or untrusted workloads on the assumption Docker is enough.
+
+## Try it in five minutes
+
+The demo needs Docker and no model. Download the release archive, or clone the
+repository and run the same commands:
+
+```bash
+./guardian-lab setup --profile demo
+./guardian-lab doctor
+./guardian-lab demo
+```
+
+The demo validates five fixed commands and never executes them. It prints the
+expected and actual decision, appends five signed audit records and checks that
+the UI rejects anonymous access. Open `http://127.0.0.1:8081` and use the
+credentials in `.env`. Release images are published for `linux/amd64`; a
+checkout builds locally on first run. See [Onboarding](docs/ONBOARDING.md) for the
+archive checksum, profiles, support matrix and troubleshooting.
+
+## What 1.4 adds
+
+A first-run CLI replaces the long manual sequence with `setup`, `doctor` and
+`demo`. The demo is deterministic, needs no model and asserts its expected
+decisions instead of only printing them. Releases publish prebuilt images and a
+checksummed archive. Forensic reports now mark an unavailable model as an
+incomplete analysis instead of returning a clean summary.
 
 ## What 1.3 adds
 
@@ -83,13 +109,14 @@ See [System One](docs/SYSTEM_ONE.md) for the measurements and replacement criter
 
 ## Running the lab
 
-Use [Install](docs/INSTALL.md) on the host chosen for the lab, from a dedicated
-terminal at the repository root. The installer creates distinct credentials on
-first installation and preserves an existing `.env`.
+`guardian-lab` is the supported first-run path. Use [Onboarding](docs/ONBOARDING.md)
+for the release archive, the demo and diagnostics. The older interactive
+`install.sh` remains available for choosing a provider and a model; both paths
+create a private `.env`.
 
 Default host ports are loopback-only: Guardian 5000, Agent 5001 and UI 8081.
 The UI requires Basic authentication and reads audit data through Guardian,
-without a SQLite mount. The installer does not start the optional model service.
+without a SQLite mount. Neither path starts the optional model service.
 
 The [authenticated dry-run example](docs/API.md#authenticated-dry-run-example)
 validates a command without executing it. Real execution also requires a
@@ -122,7 +149,8 @@ and production deployment remain outside the current implementation.
 ## Documentation
 
 [Architecture](ARCHITETTURA.md) describes the components and trust boundaries.
-Use [Configuration](docs/CONFIGURATION.md) and [API](docs/API.md) for setup and
+Start with [Onboarding](docs/ONBOARDING.md), then use
+[Configuration](docs/CONFIGURATION.md) and [API](docs/API.md) for setup and
 integration. Read [Security](docs/SECURITY.md) before reporting a vulnerability.
 
 ## License
