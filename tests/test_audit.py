@@ -1,11 +1,53 @@
 """Check transactional appends, signed metadata and honest legacy-history migration."""
 
 import sqlite3
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
 from database import audit_logger as audit
+
+
+def test_concurrent_startup_on_a_fresh_database(tmp_path):
+    path = tmp_path / "fresh.db"
+    barrier = threading.Barrier(4)
+
+    def worker():
+        barrier.wait()
+        audit.init_db(path)
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = [pool.submit(worker) for _ in range(4)]
+        for future in futures:
+            future.result()
+
+    assert audit.verify_logs(path)["valid"] is True
+
+
+def test_init_db_retries_a_transient_exclusive_lock(tmp_path):
+    path = tmp_path / "locked.db"
+    audit.init_db(path)
+    holder = sqlite3.connect(path, timeout=0.1)
+    holder.execute("BEGIN EXCLUSIVE")
+    errors = []
+
+    def worker():
+        try:
+            audit.init_db(path)
+        except Exception as exc:  # pragma: no cover - only on regression
+            errors.append(exc)
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+    time.sleep(0.3)
+    holder.rollback()
+    holder.close()
+    thread.join(10)
+
+    assert not thread.is_alive()
+    assert errors == []
 
 
 def test_concurrent_chain_and_idempotent_schema(tmp_path):

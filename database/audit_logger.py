@@ -12,6 +12,7 @@ import json
 import os
 import re
 import sqlite3
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -102,13 +103,33 @@ def _legacy_anchor(rows):
     return "LEGACY:" + hashlib.sha256(canonical([dict(row) for row in rows]).encode()).hexdigest()
 
 
+def _retry_locked(connection, statement, attempts=20, delay=0.1):
+    """Retry a statement that can return SQLITE_BUSY during concurrent startup.
+
+    Changing the journal mode needs an exclusive lock and does not always honor
+    the busy timeout. Gunicorn starts workers in parallel against a fresh file.
+    """
+    for attempt in range(attempts):
+        try:
+            connection.execute(statement)
+            return
+        except sqlite3.OperationalError as exc:
+            message = str(exc).lower()
+            if "locked" not in message and "busy" not in message:
+                raise
+            if attempt == attempts - 1:
+                raise
+            time.sleep(delay)
+
+
 def init_db(path=None):
     target = database_path(path)
     if target != ":memory:":
         Path(target).parent.mkdir(parents=True, exist_ok=True)
     connection = connect(path)
     try:
-        connection.execute("PRAGMA journal_mode=WAL")
+        connection.execute("PRAGMA busy_timeout=15000")
+        _retry_locked(connection, "PRAGMA journal_mode=WAL")
         # BEGIN IMMEDIATE serializes migration across Gunicorn processes as well
         # as appends; never catch arbitrary migration errors as 'already exists'.
         connection.execute("BEGIN IMMEDIATE")
