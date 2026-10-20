@@ -1,6 +1,6 @@
-# Verification record: hardening and System One
+# Verification record: hardening, System One and onboarding
 
-Scope: release 1.3.1, published from branch `feature/system-one-hardening` and
+Scope: release 1.4.0, published from branch `feature/system-one-hardening` and
 based on `15b6f6672a6a12546e25e795d66a91919c93f02f`. This is not a production
 approval. Model-based enforcement remains disabled and no remote deployment was
 performed.
@@ -9,11 +9,11 @@ performed.
 
 | Check | Observed result |
 | --- | --- |
-| Complete offline pytest suite | **354 passed** (182 baseline, 172 adversarial), no skips |
-| Application/scripts/tests Pyright | 0 errors, 0 warnings |
+| Complete offline pytest suite | **374 passed** (354 prior, 20 onboarding/forensics/audit regression), no skips |
+| Application/scripts/tests/onboarding Pyright | 0 errors, 0 warnings |
 | Separate model-service Pyright project | 0 errors, 0 warnings |
-| Ruff on changed runtime surfaces, including model service | Passed |
-| Installer Bash syntax | Passed |
+| Ruff on runtime surfaces, onboarding and model service | Passed |
+| Installer and release-package Bash syntax | Passed |
 | Entrypoint/bootstrap/config-check POSIX shell syntax | Passed |
 | `git diff --check` | Passed |
 | Installed application-environment dependency audit | No known advisories reported |
@@ -28,12 +28,12 @@ in the coding session's own process:
 
 ```bash
 .venv/bin/python -m pytest -q
-.venv/bin/pyright guardian database agent ui scripts tests
+.venv/bin/pyright guardian database agent ui scripts tests tools
 .venv/bin/pyright -p system-one
-.venv/bin/ruff check guardian database agent ui \
+.venv/bin/ruff check guardian database agent ui tools \
   scripts/evaluate_system_one.py scripts/pattern_learner.py \
   scripts/verify_logs.py system-one
-bash -n install.sh
+bash -n install.sh scripts/package_release.sh
 sh -n guardian/entrypoint.sh system-one/bootstrap.sh scripts/validate_config.sh
 git diff --check
 ```
@@ -52,6 +52,12 @@ rows and database-open failure. The UI has no SQLite mount, avoiding the reprodu
 read-only WAL-sidecar failure. No HTML/CSS redesign or production visual rollout
 was performed; desktop/mobile appearance was not separately requalified.
 
+Onboarding tests cover .env parsing and duplicate rejection, distinct credential
+validation, private atomic writes without printing secrets, port occupancy, the
+five-case demo contract against a fake Guardian, image-only Compose handling and
+the audit concurrency regression. The audit tests reproduce concurrent startup on
+a fresh database and a transient exclusive lock.
+
 Installer tests mock Docker/Ollama/curl and inspect private generated configuration,
 consistent model names, simulation defaults, Compose build use and preservation of
 an existing `.env`. Static Compose checks inspect contexts, COPY sources, health
@@ -64,6 +70,30 @@ service environment. Its missing-import findings were recorded as environment
 false positives only after the dedicated Pyright project passed and subprocess
 startup resolved the local quarantine module. No inline diagnostic suppression
 was added to hide those imports.
+
+## 1.4.0 onboarding verification
+
+The first-run path was tested from a clean clone at `ae8a8fa` in the same
+disposable VM. `setup` created a private `.env`; the first `demo` built and
+started the three services. That run exposed a real startup race: two Gunicorn
+workers enabled WAL on a fresh database at the same time and one failed with
+`database is locked`, so Compose declared Guardian unhealthy. `init_db` now
+retries the journal-mode switch, with concurrent-startup and transient-lock
+regression tests.
+
+The repeated run passed: five of five decisions, +5 audit rows, a valid 5-row
+chain and UI 401/200. `doctor` reported every check ok. A second
+`demo --no-start` passed and grew the chain to 10 signed rows. Containers ran as
+`1000:1000`; ports were loopback-only. `doctor --probe-models` reported the
+missing Ollama endpoint as a warning in the demo profile. The release Compose
+file passed `docker compose config --quiet`. The release archive built locally,
+its `SHA256SUMS` verified, and the packaged CLI started; GHCR publication and the
+archive upload happen in the tag workflow and were not exercised locally.
+Incomplete forensic analysis now yields `analysis_complete=false`, an
+UNAVAILABLE card and a summary that does not claim a clean session.
+
+The pull-request CI result is recorded in the release checklist. The local suite,
+Pyright and Ruff commands above passed before that run.
 
 ## Adversarial review (Sol 6.1)
 
@@ -78,8 +108,10 @@ real defects, which were then fixed:
 - malformed nested audit rows produced a 500 dashboard instead of 503;
 - unsupported forensic shell syntax was labelled green from the tool name.
 
-The full suite now passes with 354 tests. This review used only the offline
-harness; it did not prove sandbox behaviour, container effects or model accuracy.
+At that point the full suite passed with 354 tests; the current suite adds
+onboarding, concurrency and incomplete-analysis cases. This review used only the
+offline harness; it did not prove sandbox behaviour, container effects or model
+accuracy.
 
 ## Container verification in a disposable VM
 

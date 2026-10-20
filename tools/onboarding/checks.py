@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -14,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
 
-from .envfile import EnvIssue, read_env_file, validate_env
+from tools.onboarding.envfile import EnvIssue, read_env_file, validate_env
 
 
 @dataclass(frozen=True)
@@ -82,6 +83,15 @@ def run_compose(
     return run_command(compose_command(root, env_file, compose_file, args), cwd=root, timeout=timeout)
 
 
+def _has_build_section(compose_file: Path) -> bool:
+    """A release bundle uses only images; --build would be meaningless there."""
+    try:
+        content = compose_file.read_text(encoding="utf-8")
+    except OSError:
+        return True
+    return re.search(r"^\s+build:\s*$", content, re.MULTILINE) is not None
+
+
 def compose_up(
     root: Path,
     env_file: Path,
@@ -90,7 +100,7 @@ def compose_up(
     timeout: int = 900,
 ) -> int:
     args = ["up"]
-    if build:
+    if build and _has_build_section(compose_file):
         args.append("--build")
     args.extend(["-d", "--wait", "--wait-timeout", "600"])
     command = compose_command(root, env_file, compose_file, args)
@@ -172,7 +182,12 @@ def check_state_dirs(root: Path) -> list[Check]:
                     f"mkdir -p {relative} && chown $(id -u):$(id -g) {relative}",
                 )
             )
-        elif not os.access(path, os.W_OK):
+            continue
+        try:
+            writable = os.access(path, os.W_OK)
+        except OSError:
+            writable = False
+        if not writable:
             checks.append(
                 Check(
                     "state",

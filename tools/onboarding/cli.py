@@ -10,7 +10,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Sequence
 
-from .checks import (
+from tools.onboarding.checks import (
     Check,
     check_docker,
     check_ports,
@@ -19,8 +19,14 @@ from .checks import (
     create_state_dirs,
     run_doctor,
 )
-from .demo import run_demo
-from .envfile import EnvError, generate_env, read_env_file, validate_env, write_env_file
+from tools.onboarding.demo import run_demo
+from tools.onboarding.envfile import (
+    EnvError,
+    generate_env,
+    read_env_file,
+    validate_env,
+    write_env_file,
+)
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[2]
 

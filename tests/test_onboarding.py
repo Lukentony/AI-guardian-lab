@@ -266,6 +266,28 @@ def test_compose_up_places_build_after_the_subcommand(tmp_path: Path, monkeypatc
     assert calls[0][calls[0].index("up") + 1] == "--build"
 
 
+def test_compose_up_skips_build_for_an_image_only_bundle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    compose = tmp_path / "docker-compose.yml"
+    compose.write_text("services:\n  demo:\n    image: python:3.11-slim\n", encoding="utf-8")
+    calls: list[list[str]] = []
+
+    class Result:
+        returncode = 0
+
+    def fake_run(command: list[str], **kwargs: object) -> Result:
+        calls.append(command)
+        return Result()
+
+    monkeypatch.setattr(check_module.subprocess, "run", fake_run)
+
+    code = check_module.compose_up(tmp_path, tmp_path / ".env", compose, build=True)
+
+    assert code == 0
+    assert "--build" not in calls[0]
+
+
 def test_setup_creates_config_without_printing_secrets(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     ok = [Check("docker", "daemon", True, True, "ok")]
     with (
