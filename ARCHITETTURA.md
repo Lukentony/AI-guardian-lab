@@ -1,6 +1,6 @@
 # AI Guardian Lab architecture
 
-This document describes release 1.4.0, based on v1.2.0, including the
+This document describes release 1.5.0, based on v1.2.0, including the
 System One observer and the onboarding CLI. The lab does not provide a production
 sandbox.
 
@@ -22,7 +22,7 @@ One only records observations: it supports `off` and `shadow`, and rejects `enfo
 | --- | --- | --- |
 | Guardian | Policy, task registry, validation, audit, forensics API | Python 3.11, Flask/Gunicorn |
 | Agent | Command generation, strict approval consumer, simulation/outcome reporting | Python 3.11, Flask/Gunicorn |
-| UI | Authenticated audit viewer and forensic form | Python 3.11, Flask/Gunicorn |
+| UI | Authenticated dashboard, deterministic demo, status and forensic form | Python 3.11, Flask/Gunicorn |
 | Optional System One | Local typed inference, one admitted job, no execution | Python 3.13, Kev/PyTorch CPU, FastAPI/Uvicorn |
 | Onboarding CLI | Private configuration, read-only diagnostics and a non-executing demo | Python 3.11, standard library |
 | Shared audit module | Schema migration, redaction, transactional HMAC append and verification | `database/audit_logger.py` |
@@ -59,6 +59,25 @@ One only records observations: it supports `off` and `shadow`, and rejects `enfo
 The concurrency semaphore is per Guardian worker (10 each), not a cluster-wide
 limit. Default in-memory rate limiting is also per worker; shared enforcement
 needs a separately configured store. Client validation timeout is five seconds.
+
+## Interface
+
+The UI is server-rendered Flask/Jinja with a local stylesheet and small vanilla
+scripts. It has no execution path and no database mount.
+
+- `/` reads the authenticated audit API through Guardian and renders summary
+  metrics, recent decisions, source badges and a client-side filter.
+- `/demo` sends the five fixed CLI cases to `/validate` through a server-side
+  credential. It has a short cooldown, requires a same-origin POST and never
+  calls an executor. Every click appends five signed decisions.
+- `/status` probes Guardian, Agent and the audit API over loopback. It does not
+  inspect Docker, the model service or the signing key; `guardian-lab doctor`
+  remains authoritative for those checks.
+- `/forensics` accepts a bounded transcript and displays the report, including an
+  explicit incomplete state when a model check did not answer.
+
+The UI reads `AGENT_URL` and `APP_VERSION` from its environment. Static assets
+are copied into the image; no CDN, external font or frontend build step is used.
 
 ## Trust and task context
 

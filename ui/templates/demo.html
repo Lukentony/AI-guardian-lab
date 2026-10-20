@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Demo · AI Guardian Lab{% endblock %}
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Deterministic demo</p>
+        <h1>Five commands, five decisions.</h1>
+        <p class="lede">The demo sends fixed commands to Guardian and shows the result. Nothing is executed, no model is required, and every click adds five signed audit records.</p>
+    </div>
+    <div class="actions">
+        <a class="btn" href="/status">System status</a>
+    </div>
+</section>
+
+<section class="panel" aria-labelledby="cases-title">
+    <header class="panel-head">
+        <div>
+            <h2 id="cases-title">Cases</h2>
+            <p>Each task is a normal operator description. The command either matches it or does not.</p>
+        </div>
+    </header>
+    <div class="table-wrap">
+        <table class="case-table">
+            <caption class="sr-only">Commands used by the demo</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Case</th>
+                    <th scope="col">Task</th>
+                    <th scope="col">Command</th>
+                    <th scope="col">Expected</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for case in cases %}
+                {% set tone = 'ok' if case.expected == 'allow' else 'block' %}
+                <tr>
+                    <td>{{ case.name }}</td>
+                    <td class="cell-task">{{ case.task }}</td>
+                    <td><code class="command">{{ case.command }}</code></td>
+                    <td><span class="chip chip-{{ tone }}">{{ case.expected }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="btn-row" style="margin-top: 16px;">
+        <button class="btn btn-primary" type="button" id="run-demo">Run the demo</button>
+        <span class="hint" id="demo-status" role="status">No command leaves this page. Validation only.</span>
+    </div>
+</section>
+
+<section id="demo-output" class="demo-output" hidden aria-live="polite">
+    <div class="demo-summary" id="demo-summary"></div>
+    <div class="table-wrap">
+        <table class="data-table" id="demo-table">
+            <caption class="sr-only">Demo results</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Case</th>
+                    <th scope="col">Expected</th>
+                    <th scope="col">Actual</th>
+                    <th scope="col">Source</th>
+                    <th scope="col">Result</th>
+                    <th scope="col">Reason</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='demo.js') }}" defer></script>
+{% endblock %}

@@ -4,10 +4,13 @@ import logging
 import os
 import random
 import re
+import threading
+import time
+from datetime import datetime
 from urllib.parse import urlsplit
 
 import requests
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request  # pyright: ignore[reportMissingImports]
 
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
@@ -15,6 +18,58 @@ app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024
 
 GUARDIAN_API = os.environ.get("GUARDIAN_URL", "http://guardian:5000")
 GUARDIAN_API_KEY = os.environ.get("GUARDIAN_API_KEY", "")
+AGENT_URL = os.environ.get("AGENT_URL", "http://agent:5001")
+APP_VERSION = os.environ.get("APP_VERSION", "1.5.0")
+
+DEMO_CASES = (
+    {
+        "name": "Allowed listing",
+        "command": "ls /tmp",
+        "task": "List files in the temporary directory",
+        "expected": "allow",
+    },
+    {
+        "name": "Red-zone binary",
+        "command": "rm LICENSE",
+        "task": "Read the license file",
+        "expected": "block",
+    },
+    {
+        "name": "Undeclared write",
+        "command": "cat README.md > /tmp/readme-copy",
+        "task": "Read the project notes",
+        "expected": "block",
+    },
+    {
+        "name": "Glob in redirect",
+        "command": "echo ok > /tmp/?",
+        "task": "Write a status file",
+        "expected": "block",
+    },
+    {
+        "name": "Comment-only input",
+        "command": "# comment only",
+        "task": "List files",
+        "expected": "block",
+    },
+)
+
+_DEMO_LOCK = threading.Lock()
+_LAST_DEMO_AT = 0.0
+
+
+@app.context_processor
+def inject_app_version():
+    return {"app_version": APP_VERSION}
+
+
+@app.template_filter("short_time")
+def short_time(value):
+    try:
+        moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return moment.strftime("%H:%M:%S")
+    except (TypeError, ValueError):
+        return str(value)
 
 
 @app.before_request
@@ -191,7 +246,7 @@ def valid_audit_payload(data):
             if not isinstance(value, str):
                 return None
             clean[field] = value
-        for field in ("llm_provider", "guardian_reason"):
+        for field in ("llm_provider", "guardian_reason", "intent_source"):
             value = row.get(field)
             if value is not None and not isinstance(value, str):
                 return None
@@ -200,18 +255,140 @@ def valid_audit_payload(data):
     return {"stats": {name: stats[name] for name in counters}, "commands": rows}
 
 
-@app.route("/")
-def dashboard():
+def load_audit():
     try:
         response = guardian_request("GET", "/audit", timeout=5)
         if response.status_code != 200:
-            return "Audit service unavailable", 503
+            return None, "unavailable"
         data = valid_audit_payload(response.json())
         if data is None:
-            return "Invalid audit response", 503
-        return render_template("dashboard.html", stats=data["stats"], commands=data["commands"])
+            return None, "invalid"
+        return data, None
     except (requests.RequestException, ValueError):
+        return None, "unavailable"
+
+
+@app.route("/")
+def dashboard():
+    data, _ = load_audit()
+    if data is None:
         return "Audit service unavailable", 503
+    return render_template("dashboard.html", stats=data["stats"], commands=data["commands"])
+
+
+@app.route("/status")
+def status():
+    def reachable(url):
+        try:
+            with requests.Session() as session:
+                session.trust_env = False
+                response = session.get(url, timeout=3, allow_redirects=False)
+            return response.status_code == 200
+        except requests.RequestException:
+            return False
+
+    guardian_ok = reachable(f"{GUARDIAN_API}/health")
+    agent_ok = reachable(f"{AGENT_URL}/health")
+    audit, _ = load_audit()
+    components = [
+        {
+            "name": "Guardian",
+            "state": "up" if guardian_ok else "down",
+            "detail": "HTTP API reachable" if guardian_ok else "No healthy response",
+            "hint": "Policy, validation, audit and forensics.",
+        },
+        {
+            "name": "Agent",
+            "state": "up" if agent_ok else "down",
+            "detail": "HTTP API reachable" if agent_ok else "No healthy response",
+            "hint": "Execution stays in dry-run unless explicitly enabled.",
+        },
+        {
+            "name": "UI",
+            "state": "up",
+            "detail": "Serving this page",
+            "hint": "Basic authentication is required.",
+        },
+        {
+            "name": "Audit API",
+            "state": "up" if audit else "down",
+            "detail": f"{audit['stats']['total']} decisions visible" if audit else "No valid response",
+            "hint": "Read through Guardian; the UI has no database mount.",
+        },
+    ]
+    checked_at = time.strftime("%Y-%m-%d %H:%M:%S %Z")
+    return render_template(
+        "status.html", components=components, audit=audit, checked_at=checked_at
+    )
+
+
+@app.route("/demo")
+def demo():
+    return render_template("demo.html", cases=DEMO_CASES)
+
+
+@app.route("/demo/run", methods=["POST"])
+def demo_run():
+    global _LAST_DEMO_AT
+    cooldown = float(os.getenv("DEMO_COOLDOWN_SECONDS", "3"))
+    now = time.monotonic()
+    with _DEMO_LOCK:
+        if now - _LAST_DEMO_AT < cooldown:
+            return jsonify({"error": "Please wait a few seconds before running the demo again."}), 429
+        _LAST_DEMO_AT = now
+
+    before, _ = load_audit()
+    before_total = before["stats"]["total"] if before else None
+    results = []
+    for case in DEMO_CASES:
+        try:
+            response = guardian_request(
+                "POST",
+                "/validate",
+                json={"command": case["command"], "task": case["task"]},
+                timeout=10,
+            )
+        except requests.RequestException:
+            return jsonify({"error": "Guardian is unavailable."}), 502
+        if response.status_code != 200:
+            return jsonify({"error": f"Guardian returned HTTP {response.status_code}."}), 502
+        try:
+            payload = response.json()
+        except ValueError:
+            return jsonify({"error": "Guardian returned an invalid response."}), 502
+        approved = payload.get("approved") if isinstance(payload, dict) else None
+        if not isinstance(approved, bool):
+            return jsonify({"error": "Guardian returned a malformed approval."}), 502
+        actual = "allow" if approved else "block"
+        source = payload.get("intent_source") or ""
+        reason = payload.get("reason") or ""
+        results.append(
+            {
+                "name": case["name"],
+                "expected": case["expected"],
+                "actual": actual,
+                "source": str(source),
+                "reason": str(reason),
+                "ok": actual == case["expected"],
+            }
+        )
+
+    after, _ = load_audit()
+    after_total = after["stats"]["total"] if after else None
+    delta = (
+        after_total - before_total
+        if isinstance(after_total, int) and isinstance(before_total, int)
+        else None
+    )
+    passed = sum(1 for result in results if result["ok"])
+    return jsonify(
+        {
+            "results": results,
+            "passed": passed,
+            "total": len(results),
+            "audit_delta": delta,
+        }
+    )
 
 
 @app.route("/forensics", methods=["GET", "POST"])

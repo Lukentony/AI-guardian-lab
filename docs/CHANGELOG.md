@@ -1,9 +1,22 @@
 # Changelog
 
 Entries below record earlier releases. Their original layer numbering and security
-claims are historical, not verification of release 1.4.0. The hardening work
+claims are historical, not verification of release 1.5.0. The hardening work
 uses L3 for deterministic intent mapping and L4 for semantic review. See
 [Verification](VERIFICATION.md) for current results.
+
+## [1.5.0] - 2026-10-20
+
+Rebuilt the browser interface around the decision trail.
+
+- Added a dashboard with summary metrics, search, status filtering and source
+  badges.
+- Added a deterministic demo page and endpoint that runs the same five cases as
+  the CLI, applies a cooldown and never executes a command.
+- Added a read-only status page for Guardian, Agent and the audit API.
+- Restyled the forensics report and kept the incomplete-analysis warning.
+- `/audit` now returns `intent_source` for the dashboard.
+- Added UI and template regression tests. No API breaking changes.
 
 ## [1.4.0] - 2026-10-20
 

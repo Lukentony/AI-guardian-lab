@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
+from fastapi.testclient import TestClient  # pyright: ignore[reportMissingImports]
 
 from ui import app as ui
 
@@ -154,3 +154,143 @@ def test_ui_does_not_follow_backend_redirects(monkeypatch, requests_mock):
     with ui.app.test_client() as client:
         assert client.get("/", headers=headers).status_code == 503
     assert requests_mock.call_count == 1
+
+
+def _auth_headers():
+    import base64
+
+    token = base64.b64encode(b"guardian:ui-test-password").decode()
+    return {"Authorization": "Basic " + token}
+
+
+def test_ui_demo_cases_match_the_cli_contract():
+    from tools.onboarding.demo import CASES
+
+    ui_cases = [
+        (case["name"], case["command"], case["task"], case["expected"])
+        for case in ui.DEMO_CASES
+    ]
+    cli_cases = [
+        (case.name, case.command, case.task, "allow" if case.approved else "block")
+        for case in CASES
+    ]
+    assert ui_cases == cli_cases
+
+
+def test_ui_status_reports_components(monkeypatch, requests_mock):
+    monkeypatch.setenv("UI_PASSWORD", "ui-test-password")
+    requests_mock.get(f"{ui.GUARDIAN_API}/health", json={"status": "healthy"})
+    requests_mock.get(f"{ui.AGENT_URL}/health", json={"status": "healthy"})
+    requests_mock.get(
+        f"{ui.GUARDIAN_API}/audit",
+        json={
+            "stats": {"total": 1, "executed": 0, "rejected": 1},
+            "commands": [],
+        },
+    )
+
+    with ui.app.test_client() as client:
+        response = client.get("/status", headers=_auth_headers())
+
+    assert response.status_code == 200
+    assert b"Guardian" in response.data
+    assert b"Agent" in response.data
+    assert b"Audit API" in response.data
+
+
+def test_ui_status_survives_backend_outage(monkeypatch, requests_mock):
+    monkeypatch.setenv("UI_PASSWORD", "ui-test-password")
+    requests_mock.get(f"{ui.GUARDIAN_API}/health", status_code=503, json={})
+    requests_mock.get(f"{ui.AGENT_URL}/health", status_code=503, json={})
+    requests_mock.get(f"{ui.GUARDIAN_API}/audit", status_code=503, json={})
+
+    with ui.app.test_client() as client:
+        response = client.get("/status", headers=_auth_headers())
+
+    assert response.status_code == 200
+    assert b"No healthy response" in response.data
+    assert b"Audit unavailable" in response.data
+
+
+def test_ui_demo_page_lists_cases(monkeypatch):
+    monkeypatch.setenv("UI_PASSWORD", "ui-test-password")
+    with ui.app.test_client() as client:
+        response = client.get("/demo", headers=_auth_headers())
+
+    assert response.status_code == 200
+    assert b"Run the demo" in response.data
+    assert b"ls /tmp" in response.data
+
+
+def test_ui_demo_run_validates_without_executing(monkeypatch, requests_mock):
+    monkeypatch.setenv("UI_PASSWORD", "ui-test-password")
+    monkeypatch.setenv("DEMO_COOLDOWN_SECONDS", "0")
+    monkeypatch.setattr(ui, "_LAST_DEMO_AT", 0.0)
+    requests_mock.get(
+        f"{ui.GUARDIAN_API}/audit",
+        [
+            {"json": {"stats": {"total": 10, "executed": 0, "rejected": 1}, "commands": []}},
+            {"json": {"stats": {"total": 15, "executed": 0, "rejected": 2}, "commands": []}},
+        ],
+    )
+
+    def validate(request, context):
+        payload = request.json()
+        approved = payload.get("command") == "ls /tmp"
+        return {
+            "approved": approved,
+            "intent_source": "mapping" if approved else "shell",
+            "reason": "test decision",
+        }
+
+    requests_mock.post(f"{ui.GUARDIAN_API}/validate", json=validate)
+
+    with ui.app.test_client() as client:
+        response = client.post("/demo/run", headers=_auth_headers(), json={})
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["passed"] == 5
+    assert data["total"] == 5
+    assert data["audit_delta"] == 5
+    assert all(result["ok"] for result in data["results"])
+
+
+def test_ui_demo_run_blocks_cross_origin(monkeypatch, requests_mock):
+    monkeypatch.setenv("UI_PASSWORD", "ui-test-password")
+    with ui.app.test_client() as client:
+        response = client.post(
+            "/demo/run",
+            headers={**_auth_headers(), "Origin": "http://outside.invalid"},
+            json={},
+        )
+
+    assert response.status_code == 403
+    assert not requests_mock.called
+
+
+def test_ui_dashboard_accepts_intent_source(monkeypatch, requests_mock):
+    monkeypatch.setenv("UI_PASSWORD", "ui-test-password")
+    requests_mock.get(
+        f"{ui.GUARDIAN_API}/audit",
+        json={
+            "stats": {"total": 1, "executed": 0, "rejected": 0},
+            "commands": [
+                {
+                    "timestamp": "2026-10-20T12:00:00Z",
+                    "task": "list files",
+                    "command": "ls /tmp",
+                    "status": "approved",
+                    "llm_provider": "",
+                    "guardian_reason": "ok",
+                    "intent_source": "mapping",
+                }
+            ],
+        },
+    )
+
+    with ui.app.test_client() as client:
+        response = client.get("/", headers=_auth_headers())
+
+    assert response.status_code == 200
+    assert b"mapping" in response.data

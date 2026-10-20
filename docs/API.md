@@ -58,8 +58,9 @@ See [response schema](schemas/validate_response.json).
 Authenticated, rate-limited read API for the UI. Returns `stats` with `total`
 (validation decisions, not terminal outcomes), `executed` and `rejected`, plus
 at most 20 latest `commands` containing timestamp, task, command, status,
-llm_provider and guardian_reason. Audit access failure returns 503. UI receives
-this through its server-side credential and never mounts the SQLite directory.
+`intent_source`, llm_provider and guardian_reason. Audit access failure returns
+503. UI receives this through its server-side credential and never mounts the
+SQLite directory.
 
 ### POST /tasks
 

@@ -70,6 +70,20 @@ expected decision changes.
 It does not prove model generation, semantic review quality, command execution,
 sandbox isolation or real detection accuracy.
 
+## Browser interface
+
+Open `http://127.0.0.1:8081` after the demo. The dashboard shows the signed
+decisions and links to:
+
+- **Demo**: the same five cases as the CLI, with a short cooldown and no
+  execution. Each click appends five records.
+- **Forensics**: paste or upload an OpenHands or SWE-agent transcript.
+- **Status**: Guardian, Agent and audit reachability. It does not check Docker,
+  Ollama or the signing key; use `guardian-lab doctor` for those.
+
+The interface is read-only apart from the demo and forensics POSTs. It has no
+command execution, no Docker socket and no database mount.
+
 ## Profiles
 
 - `demo` keeps `EXECUTE_COMMANDS=false` and requires no model. Ambiguous commands

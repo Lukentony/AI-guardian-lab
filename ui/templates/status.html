@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Status · AI Guardian Lab{% endblock %}
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Status</p>
+        <h1>What this instance can verify.</h1>
+        <p class="lede">The dashboard checks Guardian, Agent and the audit API through the loopback network. It does not inspect Docker, the model service or the signing key.</p>
+    </div>
+    <div class="actions">
+        <a class="btn" href="/">Back to dashboard</a>
+    </div>
+</section>
+
+<section class="component-grid" aria-label="Component status">
+    {% for component in components %}
+    <article class="component">
+        <div class="component-head">
+            <span class="dot dot-{{ component.state }}" aria-hidden="true"></span>
+            <h2>{{ component.name }}</h2>
+        </div>
+        <p>{{ component.detail }}</p>
+        {% if component.hint %}
+        <p class="hint">{{ component.hint }}</p>
+        {% endif %}
+    </article>
+    {% endfor %}
+</section>
+
+<div class="content-grid">
+    <section class="panel" aria-labelledby="audit-title">
+        <h2 id="audit-title">Audit API</h2>
+        {% if audit %}
+        <p class="muted">Read through the authenticated Guardian endpoint. The UI has no database mount.</p>
+        <dl class="facts">
+            <div>
+                <dt>Total decisions</dt>
+                <dd>{{ audit.stats.total }}</dd>
+            </div>
+            <div>
+                <dt>Blocked</dt>
+                <dd>{{ audit.stats.rejected }}</dd>
+            </div>
+            <div>
+                <dt>Executed</dt>
+                <dd>{{ audit.stats.executed }}</dd>
+            </div>
+            <div>
+                <dt>Latest rows</dt>
+                <dd>{{ audit.commands|length }}</dd>
+            </div>
+        </dl>
+        <a class="text-link" href="/">Open the dashboard</a>
+        {% else %}
+        <div class="banner banner-warn" role="alert">
+            <strong>Audit unavailable.</strong> Guardian is not returning a valid audit response. The rest of this page may still work.
+        </div>
+        {% endif %}
+        <p class="hint" style="margin-top: 14px;">Checked at {{ checked_at }}.</p>
+    </section>
+
+    <aside class="side-stack">
+        <section class="panel" aria-labelledby="doctor-title">
+            <h2 id="doctor-title">Full diagnostics</h2>
+            <p class="muted">Docker, ports, state ownership, model reachability and the signature chain are checked by the CLI.</p>
+            <pre class="code-block">./guardian-lab doctor</pre>
+            <p class="hint">Add <code class="code-inline">--probe-models</code> to test the Ollama endpoint and reviewer model.</p>
+        </section>
+        <section class="panel" aria-labelledby="limits-title">
+            <h2 id="limits-title">Scope</h2>
+            <p class="muted">A green card means the local HTTP check passed. It is not a production approval, and it does not prove command execution or model accuracy.</p>
+        </section>
+    </aside>
+</div>
+{% endblock %}

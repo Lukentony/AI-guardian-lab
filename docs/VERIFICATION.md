@@ -1,6 +1,6 @@
-# Verification record: hardening, System One and onboarding
+# Verification record: hardening, onboarding and interface
 
-Scope: release 1.4.0, published from branch `feature/system-one-hardening` and
+Scope: release 1.5.0, published from branch `feature/system-one-hardening` and
 based on `15b6f6672a6a12546e25e795d66a91919c93f02f`. This is not a production
 approval. Model-based enforcement remains disabled and no remote deployment was
 performed.
@@ -9,11 +9,12 @@ performed.
 
 | Check | Observed result |
 | --- | --- |
-| Complete offline pytest suite | **374 passed** (354 prior, 20 onboarding/forensics/audit regression), no skips |
+| Complete offline pytest suite | **381 passed** (354 prior, 27 onboarding/forensics/audit/UI regression), no skips |
 | Application/scripts/tests/onboarding Pyright | 0 errors, 0 warnings |
 | Separate model-service Pyright project | 0 errors, 0 warnings |
 | Ruff on runtime surfaces, onboarding and model service | Passed |
 | Installer and release-package Bash syntax | Passed |
+| Headless UI review at 1440 and 390 | Dashboard, demo, status and forensics inspected |
 | Entrypoint/bootstrap/config-check POSIX shell syntax | Passed |
 | `git diff --check` | Passed |
 | Installed application-environment dependency audit | No known advisories reported |
@@ -96,6 +97,28 @@ UNAVAILABLE card and a summary that does not claim a clean session.
 The pull-request CI result passed on PR #4 at `80a5325`: both the offline test job
 and the onboarding job (setup, image build, doctor, demo) completed. The local
 suite, Pyright and Ruff commands above passed before that run.
+
+## 1.5.0 interface verification
+
+The browser interface was rebuilt and checked with the Flask test client and
+headless Chromium.
+
+- Dashboard, demo, status and forensics require Basic authentication; `/health`
+  remains public.
+- The demo endpoint runs the five fixed cases through a mocked Guardian, adds five
+  audit rows, rejects cross-origin POSTs and has no executor call. The UI cases
+  are compared with the CLI cases by a regression test.
+- The status page renders both healthy and unavailable backends without failing
+  the page itself. It reports only what the UI can reach; Docker and model checks
+  remain in `guardian-lab doctor`.
+- The dashboard accepts the new `intent_source` field and still rejects malformed
+  nested rows with 503.
+- The layout was inspected at 1440x1100 and 390x844. The mobile decisions table
+  stays inside its horizontal scroller; the page itself does not overflow.
+- The stylesheet and icons are local. No CDN, external font or new frontend
+  framework is used.
+- No visual-regression tool was used; the review is manual and does not replace a
+  usability test with external users.
 
 ## Adversarial review (Sol 6.1)
 
