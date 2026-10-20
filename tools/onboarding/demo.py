@@ -132,8 +132,10 @@ def run_demo(
             return 1
         out("Starting the lab. The first build can take a few minutes.")
         if compose_up(root, env_file, compose_file, build=build) != 0:
-            out("The stack did not start. Check: docker compose logs --tail=100 guardian")
-            return 1
+            if not _wait_for_guardian(values):
+                out("The stack did not start. Check: docker compose logs --tail=100 guardian")
+                return 1
+            out("Compose reported a startup warning; Guardian is healthy now.")
         if not _wait_for_guardian(values):
             out("Guardian did not become healthy in time.")
             return 1
