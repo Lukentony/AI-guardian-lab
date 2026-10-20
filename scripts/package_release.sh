@@ -58,7 +58,10 @@ epoch="${epoch:-$(date +%s)}"
 
 tar --sort=name --mtime="@$epoch" --owner=0 --group=0 --numeric-owner \
     -czf "$archive" -C "$output" "ai-guardian-lab-$version"
-sha256sum "$archive" > "$archive.sha256"
+(
+    cd "$output"
+    sha256sum "ai-guardian-lab-$version.tar.gz" > "ai-guardian-lab-$version.tar.gz.sha256"
+)
 
 echo "Bundle: $archive"
 echo "Checksum: $archive.sha256"
