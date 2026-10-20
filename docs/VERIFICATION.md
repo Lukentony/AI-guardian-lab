@@ -21,7 +21,8 @@ performed.
 | Model service/bootstrap quarantine subprocess checks | Refused before model imports/downloads or socket startup |
 | Container build and startup in a disposable Ubuntu 24.04 VM | 3 images built; all services healthy |
 | UI authentication, audit API, chain verifier, restart persistence | Passed; details below |
-| GitHub Actions CI at 9f68090 | Completed successfully |
+| GitHub Actions CI at 9f68090 (1.3.1) | Completed successfully |
+| GitHub Actions CI at 80a5325 (PR #4) | Test and onboarding jobs passed |
 
 The following checks ran from the repository root on the development machine,
 in the coding session's own process:
@@ -92,8 +93,9 @@ archive upload happen in the tag workflow and were not exercised locally.
 Incomplete forensic analysis now yields `analysis_complete=false`, an
 UNAVAILABLE card and a summary that does not claim a clean session.
 
-The pull-request CI result is recorded in the release checklist. The local suite,
-Pyright and Ruff commands above passed before that run.
+The pull-request CI result passed on PR #4 at `80a5325`: both the offline test job
+and the onboarding job (setup, image build, doctor, demo) completed. The local
+suite, Pyright and Ruff commands above passed before that run.
 
 ## Adversarial review (Sol 6.1)
 
@@ -197,5 +199,6 @@ repeat evaluation. The recorded local runtime is no longer permitted to start.
 
 The GitHub workflow pins actions by commit and includes ordinary-service Compose
 smoke checks. It completed successfully at `9f68090`, so the container check ran
-independently on GitHub runners as well. It cannot verify model inference, and a
-target host still needs its own deployment check.
+independently on GitHub runners as well; the 1.4.0 onboarding job also passed at
+`80a5325`. It cannot verify model inference, and a target host still needs its
+own deployment check.
