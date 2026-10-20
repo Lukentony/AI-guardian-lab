@@ -25,6 +25,8 @@ will not verify earlier signatures. New installations create distinct keys.
 - `LLM_PROVIDER`: generator provider, default `ollama`.
 - `LLM_MODEL_CODER`: actual generator model name, including a provider prefix
   where LiteLLM requires one. Old `OLLAMA_MODEL_CODER` is not the runtime setting.
+- `LLM_MODEL_EXPLAIN`: forensic analysis model. Compose forwards it as
+  `FORENSICS_LLM_MODEL` to Guardian; the default is `deepseek-coder-v2:16b`.
 - `OLLAMA_URL`: explicit local/private model service address; the Compose default
   host-gateway address differs from a host shell's localhost.
 - `INTENT_LLM_MODEL`: bounded semantic reviewer used only when required.

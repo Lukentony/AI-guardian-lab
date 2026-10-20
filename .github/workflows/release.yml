@@ -62,14 +62,17 @@ jobs:
           printf '%s' "${{ secrets.GITHUB_TOKEN }}" \
             | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
       - name: Build and push the image
+        env:
+          IMAGE: ghcr.io/lukentony/ai-guardian-lab-${{ matrix.service }}
+          SOURCE: https://github.com/Lukentony/AI-guardian-lab
         run: |
           docker buildx create --use --name lab-builder || true
           docker buildx build \
             --platform linux/amd64 \
             --file "${{ matrix.dockerfile }}" \
-            --tag "ghcr.io/lukentony/ai-guardian-lab-${{ matrix.service }}:${VERSION}" \
-            --tag "ghcr.io/lukentony/ai-guardian-lab-${{ matrix.service }}:latest" \
-            --label "org.opencontainers.image.source=https://github.com/Lukentony/AI-guardian-lab" \
+            --tag "${IMAGE}:${VERSION}" \
+            --tag "${IMAGE}:latest" \
+            --label "org.opencontainers.image.source=${SOURCE}" \
             --label "org.opencontainers.image.version=${VERSION}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --provenance=true \
@@ -98,7 +101,8 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" dist/*.tar.gz dist/*.sha256 --clobber
+            gh release upload "$GITHUB_REF_NAME" \
+              dist/*.tar.gz dist/*.sha256 --clobber
           else
             gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/*.sha256 \
               --title "AI Guardian Lab $version" \

@@ -1,7 +1,8 @@
 # AI Guardian Lab architecture
 
-This document describes release 1.3.1, based on v1.2.0, including the
-System One observer. The lab does not provide a production sandbox.
+This document describes release 1.4.0, based on v1.2.0, including the
+System One observer and the onboarding CLI. The lab does not provide a production
+sandbox.
 
 ## Context and boundaries
 
@@ -23,6 +24,7 @@ One only records observations: it supports `off` and `shadow`, and rejects `enfo
 | Agent | Command generation, strict approval consumer, simulation/outcome reporting | Python 3.11, Flask/Gunicorn |
 | UI | Authenticated audit viewer and forensic form | Python 3.11, Flask/Gunicorn |
 | Optional System One | Local typed inference, one admitted job, no execution | Python 3.13, Kev/PyTorch CPU, FastAPI/Uvicorn |
+| Onboarding CLI | Private configuration, read-only diagnostics and a non-executing demo | Python 3.11, standard library |
 | Shared audit module | Schema migration, redaction, transactional HMAC append and verification | `database/audit_logger.py` |
 
 ## Validation flow
@@ -124,11 +126,12 @@ ownership of bind-mounted state directories.
 
 ## Build, verification and rollout
 
-See [installation](docs/INSTALL.md), [API](docs/API.md),
-[System One qualification](docs/SYSTEM_ONE.md) and
-[verification](docs/VERIFICATION.md). The CI workflow runs offline regression
-and Compose smoke tests without routine model-weight downloads; it passed at the
-1.3.0 release commit.
+See [installation](docs/INSTALL.md), [onboarding](docs/ONBOARDING.md),
+[API](docs/API.md), [System One qualification](docs/SYSTEM_ONE.md) and
+[verification](docs/VERIFICATION.md). The release workflow publishes images and
+an archive only for a tag; the CI workflow runs offline regression, type, lint
+and Compose smoke tests. The onboarding job starts the stack, runs `doctor` and
+asserts the five demo decisions without executing a command.
 
 The current CPU candidate failed the observer's 500 ms latency budget in local
 calibration. Its PyTorch dependency also conflicts with security updates.

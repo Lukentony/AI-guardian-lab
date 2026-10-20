@@ -39,6 +39,7 @@ PROJECT_STATE.md
 SOCIAL_MEDIA_KIT.md
 learned/
 workspace/
+dist/
 !learned/
 workspace/.gitkeep
 

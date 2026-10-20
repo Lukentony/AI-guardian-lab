@@ -16,6 +16,7 @@ services:
       INTENT_LLM_MODEL: ${INTENT_LLM_MODEL:-ollama/deepseek-coder-v2:16b}
       INTENT_LLM_TIMEOUT_SECONDS: "2"
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      FORENSICS_LLM_MODEL: ${LLM_MODEL_EXPLAIN:-deepseek-coder-v2:16b}
       DB_PATH: /var/lib/guardian/audit.db
       LEARNED_PATH: /var/lib/guardian-learned/learned_patterns.yaml
       SYSTEM_ONE_URL: ${SYSTEM_ONE_URL:-http://system-one:8009/v1/systemone}

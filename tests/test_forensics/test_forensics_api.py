@@ -1,33 +1,10 @@
+from unittest.mock import patch
+
 import pytest
-import json
-import sys
-import os
-from pathlib import Path
-from unittest.mock import patch, MagicMock
 
-# 1. Setup paths relative to project root
-root = Path(__file__).parent.parent.parent.resolve()
-guardian_guardian_path = str(root / "guardian" / "guardian")
-if guardian_guardian_path not in sys.path:
-    sys.path.append(guardian_guardian_path)
-guardian_path = str(root / "guardian")
-if guardian_path not in sys.path:
-    sys.path.append(guardian_path)
-if str(root) not in sys.path:
-    sys.path.append(str(root))
-
-# 2. Set environment variables BEFORE importing main.py to avoid Fail-Secure exit
-os.environ['PATTERNS_PATH'] = str(root / "guardian" / "config" / "patterns.yaml")
-os.environ['POLICY_PATH'] = str(root / "guardian" / "config" / "policy.yaml")
-os.environ['DB_PATH'] = ":memory:"
-os.environ['TESTING'] = "true"
-os.environ['API_KEY'] = "test-key"
-
-# Mocks are now handled by conftest.py
-
-# Now app should be importable successfully
+from guardian.forensics.analyzer import AnalysisFlag, BehaviorReport
 from guardian.guardian.main import app
-from guardian.forensics.analyzer import BehaviorReport, AnalysisFlag
+
 
 @pytest.fixture
 def client():

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from .checks import (
+from tools.onboarding.checks import (
     Check,
     base_url,
     check_audit_chain,

@@ -31,7 +31,12 @@ class AnalyzerConfig:
     llm_base_url: str = field(
         default_factory=lambda: os.environ.get("OLLAMA_URL", "http://host.docker.internal:11434")
     )
-    llm_model: str = "deepseek-coder-v2:16b"
+    llm_model: str = field(
+        default_factory=lambda: os.environ.get(
+            "FORENSICS_LLM_MODEL",
+            os.environ.get("LLM_MODEL_EXPLAIN", "deepseek-coder-v2:16b"),
+        )
+    )
     llm_timeout: int = 30
 
 
@@ -173,8 +178,10 @@ def analyze_injection_signals(session: AnnotatedSession, config: AnalyzerConfig)
 
 
 def analyze_session(
-    session: AnnotatedSession, config: AnalyzerConfig = AnalyzerConfig()
+    session: AnnotatedSession, config: AnalyzerConfig | None = None
 ) -> BehaviorReport:
+    if config is None:
+        config = AnalyzerConfig()
     escalation = analyze_escalation(session)
     intent_drift = analyze_intent_drift(session, config)
     injection_signals = analyze_injection_signals(session, config)

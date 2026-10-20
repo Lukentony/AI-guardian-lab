@@ -166,6 +166,7 @@ def generate_env(profile: str, uid: int, gid: int) -> dict[str, str]:
         "OLLAMA_URL": "http://host.docker.internal:11434",
         "LLM_MODEL_CODER": "qwen2.5-coder:7b",
         "INTENT_LLM_MODEL": "ollama/deepseek-coder-v2:16b",
+        "LLM_MODEL_EXPLAIN": "deepseek-coder-v2:16b",
         "SYSTEM_ONE_URL": "http://system-one:8009/v1/systemone",
         "GUARDIAN_BIND_IP": "127.0.0.1",
         "GUARDIAN_PORT": "5000",
