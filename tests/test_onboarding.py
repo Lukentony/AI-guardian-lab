@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
+from tools.onboarding import checks as check_module
 from tools.onboarding import cli
 from tools.onboarding import demo as demo_module
 from tools.onboarding.checks import Check, port_is_free
@@ -240,6 +241,29 @@ def test_demo_fails_when_a_decision_diverges(
 
     assert code == 1
     assert "Result:   FAIL" in "\n".join(messages)
+
+
+def test_compose_up_places_build_after_the_subcommand(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[list[str]] = []
+
+    class Result:
+        returncode = 0
+
+    def fake_run(command: list[str], **kwargs: object) -> Result:
+        calls.append(command)
+        return Result()
+
+    monkeypatch.setattr(check_module.subprocess, "run", fake_run)
+
+    code = check_module.compose_up(
+        tmp_path,
+        tmp_path / ".env",
+        tmp_path / "docker-compose.yml",
+        build=True,
+    )
+
+    assert code == 0
+    assert calls[0][calls[0].index("up") + 1] == "--build"
 
 
 def test_setup_creates_config_without_printing_secrets(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
