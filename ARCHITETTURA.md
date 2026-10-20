@@ -1,6 +1,6 @@
 # AI Guardian Lab architecture
 
-This document describes release 1.3.0, based on v1.2.0, including the
+This document describes release 1.3.1, based on v1.2.0, including the
 System One observer. The lab does not provide a production sandbox.
 
 ## Context and boundaries

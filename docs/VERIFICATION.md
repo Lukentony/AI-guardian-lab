@@ -1,6 +1,6 @@
 # Verification record: hardening and System One
 
-Scope: release 1.3.0, published from branch `feature/system-one-hardening` and
+Scope: release 1.3.1, published from branch `feature/system-one-hardening` and
 based on `15b6f6672a6a12546e25e795d66a91919c93f02f`. This is not a production
 approval. Model-based enforcement remains disabled and no remote deployment was
 performed.

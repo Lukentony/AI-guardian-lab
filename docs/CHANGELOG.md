@@ -5,7 +5,7 @@ claims are historical, not verification of release 1.3.0. The hardening work
 uses L3 for deterministic intent mapping and L4 for semantic review. See
 [Verification](VERIFICATION.md) for current results.
 
-## Unreleased
+## [1.3.1] - 2026-10-19
 
 Security fixes from an adversarial review:
 
