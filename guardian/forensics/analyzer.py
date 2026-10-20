@@ -13,6 +13,7 @@ class AnalysisFlag:
     triggered: bool
     confidence: str  # "high" | "medium" | "low" | "none"
     reason: str  # human-readable explanation, empty string if not triggered
+    evaluated: bool = True  # False when the reviewer failed to produce an answer
 
 
 @dataclass
@@ -122,7 +123,7 @@ def analyze_intent_drift(session: AnnotatedSession, config: AnalyzerConfig) -> A
 
     result = _ollama_chat(config, system_prompt, user_prompt)
     if result is None:
-        return AnalysisFlag(triggered=False, confidence="low", reason="LLM analysis failed")
+        return AnalysisFlag(triggered=False, confidence="low", reason="LLM analysis failed", evaluated=False)
 
     return AnalysisFlag(
         triggered=result.get("drifted", False),
@@ -162,7 +163,7 @@ def analyze_injection_signals(session: AnnotatedSession, config: AnalyzerConfig)
 
     result = _ollama_chat(config, system_prompt, user_prompt)
     if result is None:
-        return AnalysisFlag(triggered=False, confidence="low", reason="LLM analysis failed")
+        return AnalysisFlag(triggered=False, confidence="low", reason="LLM analysis failed", evaluated=False)
 
     return AnalysisFlag(
         triggered=result.get("injection_detected", False),
@@ -198,10 +199,28 @@ def analyze_session(
     if injection_signals.triggered:
         triggers.append("potential prompt injection")
 
-    if not triggers:
+    incomplete = [
+        name
+        for name, flag in (
+            ("intent drift", intent_drift),
+            ("injection signals", injection_signals),
+        )
+        if not flag.evaluated
+    ]
+
+    if triggers:
+        summary = f"Session shows anomalies: {', '.join(triggers)}. Total anomaly score is {anomaly_score}."
+    elif not incomplete:
         summary = "No significant behavioral anomalies detected in the session."
     else:
-        summary = f"Session shows anomalies: {', '.join(triggers)}. Total anomaly score is {anomaly_score}."
+        summary = ""
+
+    if incomplete:
+        prefix = (
+            f"Analysis incomplete: the local reviewer could not evaluate "
+            f"{', '.join(incomplete)}. The absence of anomalies is not established."
+        )
+        summary = f"{prefix} {summary}".strip()
 
     return BehaviorReport(
         session_id=session.session.session_id,

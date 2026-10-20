@@ -29,6 +29,8 @@
         .btn-upload { background: #4ecdc4; color: #1a1a2e; }
 
         .error { background: #ff6b6b; color: #fff; padding: 15px; border-radius: 8px; margin-bottom: 30px; font-weight: 600; }
+        .warning { background: #3a2a12; color: #ffd700; border: 1px solid #ffd700; padding: 15px; border-radius: 8px; margin-bottom: 30px; }
+        .warning strong { display: block; margin-bottom: 6px; }
 
         .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }
         .stat-card { background: #16213e; padding: 20px; border-radius: 12px; text-align: center; border: 2px solid #0f3460; }
@@ -45,10 +47,12 @@
         .flag-card { background: #16213e; padding: 20px; border-radius: 12px; border-left: 5px solid #0f3460; }
         .flag-card.triggered { border-left-color: #ff6b6b; }
         .flag-card.clear { border-left-color: #16c79a; }
+        .flag-card.unavailable { border-left-color: #ffd700; }
         .flag-card h4 { color: #16c79a; margin-bottom: 10px; font-size: 1.1em; }
         .flag-status { font-weight: 800; font-size: 0.8em; padding: 3px 8px; border-radius: 4px; margin-left: 10px; }
         .triggered .flag-status { background: #ff6b6b; color: #fff; }
         .clear .flag-status { background: #16c79a; color: #1a1a2e; }
+        .unavailable .flag-status { background: #ffd700; color: #1a1a2e; }
         .flag-reason { font-size: 0.9em; color: #ccc; margin-top: 10px; }
 
         table { width: 100%; background: #16213e; border-radius: 12px; overflow: hidden; border-collapse: collapse; margin-top: 20px; }
@@ -98,6 +102,13 @@
 
         {% if report %}
         <h2 style="margin-bottom: 20px; color: #16c79a;">📊 Analysis Results</h2>
+
+        {% if report.analysis_complete is defined and not report.analysis_complete %}
+        <div class="warning">
+            <strong>Incomplete analysis.</strong>
+            One or more model checks did not answer. Treat this session as not analyzed, not as clean.
+        </div>
+        {% endif %}
         
         <div class="stats">
             <div class="stat-card">
@@ -127,10 +138,11 @@
 
         <div class="flags">
             {% for key, flag in report.flags.items() %}
-            <div class="flag-card {% if flag.triggered %}triggered{% else %}clear{% endif %}">
+            {% set evaluated = flag.get('evaluated', True) %}
+            <div class="flag-card {% if not evaluated %}unavailable{% elif flag.triggered %}triggered{% else %}clear{% endif %}">
                 <h4>
                     {{ key.replace('_', ' ').title() }}
-                    <span class="flag-status">{% if flag.triggered %}TRIGGERED{% else %}CLEAR{% endif %}</span>
+                    <span class="flag-status">{% if not evaluated %}UNAVAILABLE{% elif flag.triggered %}TRIGGERED{% else %}CLEAR{% endif %}</span>
                 </h4>
                 <div style="font-size: 0.85em; color: #aaa;">Confidence: {{ flag.confidence }}</div>
                 <div class="flag-reason">{{ flag.reason }}</div>

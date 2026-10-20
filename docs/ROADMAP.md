@@ -1,12 +1,21 @@
 # Roadmap
 
-Version 1.3 repairs the v1.2.0 validator and adds a shadow-mode System One client. It remains a research lab. See [Verification](VERIFICATION.md) for
-measured results rather than treating this roadmap as a completion record.
+Version 1.4 adds a first-run CLI, a deterministic demo and release images. It
+remains a research lab. See [Verification](VERIFICATION.md) for measured results
+rather than treating this roadmap as a completion record.
+
+## Completed in 1.4
+
+- `guardian-lab setup`, `doctor` and `demo` for the first test.
+- A checksummed archive and prebuilt `linux/amd64` images.
+- Incomplete forensic analysis is no longer reported as clean.
 
 ## Next work
 
-- Verify the ordinary-service Compose build and persistent-state recovery on a
-  Docker-equipped test host.
+- Run the onboarding path on Debian, macOS Docker Desktop and WSL2, then decide
+  which targets are supported rather than experimental.
+- Verify persistent-state recovery on a long-lived host with backups.
+- Publish multi-architecture images and pin them by digest after qualification.
 - Find a compatible patched model runtime. The current Kev candidate requires a
   vulnerable PyTorch range and is quarantined.
 - Evaluate a reviewed replacement on independent workloads. The measured CPU
@@ -17,10 +26,7 @@ measured results rather than treating this roadmap as a completion record.
 
 ## Later options
 
-Shared rate-limit storage would be needed for deployment across multiple workers.
-Finer permissions and additional forensic views are possible follow-up work, not
-implemented guarantees. Additional model providers need their own license and
-privacy review.
-
-Pattern mining already produces suggestions. Automatic policy promotion is not
-a goal: an operator must review a pattern before it becomes active.
+A web setup wizard should stay assistive and must never receive the Docker socket
+or operator keys. Shared rate-limit storage would be needed across workers.
+Finer permissions and additional forensic views are follow-up work, not
+implemented guarantees. Pattern promotion remains an operator decision.

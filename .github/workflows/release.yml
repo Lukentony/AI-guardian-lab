@@ -1,0 +1,106 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Offline regression suite
+        run: python -m pytest -q
+      - name: Type checks
+        run: pyright guardian database agent ui scripts tests tools
+      - name: Lint changed runtime surfaces
+        run: >-
+          ruff check guardian database agent ui tools
+          scripts/evaluate_system_one.py scripts/pattern_learner.py
+          scripts/verify_logs.py
+      - name: Shell syntax
+        run: |
+          bash -n install.sh scripts/package_release.sh
+          sh -n guardian/entrypoint.sh system-one/bootstrap.sh
+          sh -n scripts/validate_config.sh
+
+  images:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: guardian
+            context: .
+            dockerfile: guardian/Dockerfile
+          - service: agent
+            context: ./agent
+            dockerfile: agent/Dockerfile
+          - service: ui
+            context: ./ui
+            dockerfile: ui/Dockerfile
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Resolve version
+        run: printf 'VERSION=%s\n' "${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+      - name: Log in to GHCR
+        run: |
+          printf '%s' "${{ secrets.GITHUB_TOKEN }}" \
+            | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Build and push the image
+        run: |
+          docker buildx create --use --name lab-builder || true
+          docker buildx build \
+            --platform linux/amd64 \
+            --file "${{ matrix.dockerfile }}" \
+            --tag "ghcr.io/lukentony/ai-guardian-lab-${{ matrix.service }}:${VERSION}" \
+            --tag "ghcr.io/lukentony/ai-guardian-lab-${{ matrix.service }}:latest" \
+            --label "org.opencontainers.image.source=https://github.com/Lukentony/AI-guardian-lab" \
+            --label "org.opencontainers.image.version=${VERSION}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --provenance=true \
+            --sbom=true \
+            --push \
+            "${{ matrix.context }}"
+      - name: Make the container package public
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api --method PATCH \
+            "/user/packages/container/ai-guardian-lab-${{ matrix.service }}" \
+            -f visibility=public
+
+  bundle:
+    needs: images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build the onboarding archive
+        run: ./scripts/package_release.sh "$GITHUB_REF_NAME" dist
+      - name: Publish the release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/*.tar.gz dist/*.sha256 --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/*.sha256 \
+              --title "AI Guardian Lab $version" \
+              --generate-notes
+          fi

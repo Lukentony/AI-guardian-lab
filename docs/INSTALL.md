@@ -4,7 +4,21 @@ Installation starts services on the chosen host. Use it for local research, not
 as a production sandbox. These instructions do not use sudo, change the firewall
 or deploy to a remote machine.
 
-## First installation
+## Fast path for a first test
+
+For a demo, do not start with this document. Use [Onboarding](ONBOARDING.md):
+
+```bash
+./guardian-lab setup --profile demo
+./guardian-lab doctor
+./guardian-lab demo
+```
+
+That path needs Docker and no model, writes a private `.env` and asserts five
+deterministic decisions. The rest of this page covers the interactive provider
+wizard, upgrades, manual builds and data migration.
+
+## Interactive installation
 
 On the machine chosen to run the lab, open a dedicated terminal in the repository
 root. Prerequisites are Docker with Compose v2 (`--wait` support), Python 3, curl
@@ -15,11 +29,12 @@ the baseline; the optional model service needs separate memory and model storage
 ./install.sh
 ```
 
-The provider wizard creates a private `.env` with separate API, operator, audit,
+The interactive wizard creates a private `.env` with separate API, operator, audit,
 UI and model keys. It sets the host UID/GID, uses `LLM_MODEL_CODER` consistently
 and leaves `EXECUTE_COMMANDS=false`. Keys are not printed. An existing `.env` or
 legacy audit database stops installation rather than being overwritten or migrated.
-The installer does not start the System One profile.
+The installer does not start the System One profile. For the shorter demo path,
+use `guardian-lab setup --profile demo` instead.
 
 Configure a local Ollama service explicitly. Compose uses
 `http://host.docker.internal:11434` by default; both Guardian and Agent have the

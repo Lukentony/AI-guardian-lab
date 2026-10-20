@@ -20,6 +20,7 @@ class ForensicsReport:
     max_risk_score: int
     flags: dict  # {"escalation": AnalysisFlag, "intent_drift": AnalysisFlag, "injection_signals": AnalysisFlag}
     summary: str  # human-readable, 3-5 sentences
+    analysis_complete: bool  # False when a required model evaluation failed
     timeline: list[dict]  # one entry per tool_call event only
 
     def to_dict(self) -> dict:
@@ -30,7 +31,10 @@ class ForensicsReport:
         """Returns a human-readable formatted text block."""
 
         def format_flag(name, flag):
-            status = "TRIGGERED" if flag["triggered"] else "clear"
+            if not flag.get("evaluated", True):
+                status = "UNAVAILABLE"
+            else:
+                status = "TRIGGERED" if flag["triggered"] else "clear"
             conf = flag["confidence"]
             reason = flag["reason"]
             return f"{name}: {status} ({conf})\n  {reason}"
@@ -52,6 +56,7 @@ Session:      {self.session_id}
 Framework:    {self.framework}
 Events:       {self.event_count} ({self.tool_call_count} tool calls)
 Anomaly Score: {self.anomaly_score}/100
+Analysis:     {"COMPLETE" if self.analysis_complete else "INCOMPLETE"}
 ──────────────────────────────────────
 {format_flag("ESCALATION", self.flags["escalation"])}
 {format_flag("INTENT DRIFT", self.flags["intent_drift"])}
@@ -107,6 +112,8 @@ def generate_report(report: BehaviorReport, session: AnnotatedSession) -> Forens
         "intent_drift": asdict(report.intent_drift),
         "injection_signals": asdict(report.injection_signals),
     }
+    incomplete = [name for name, flag in flags.items() if not flag["evaluated"]]
+    analysis_complete = not incomplete
 
     # 3. Build summary
     summary_parts = [
@@ -128,8 +135,14 @@ def generate_report(report: BehaviorReport, session: AnnotatedSession) -> Forens
                 summary_parts[-1] += "."
             triggered_flag_found = True
 
-    if not triggered_flag_found:
+    if not triggered_flag_found and analysis_complete:
         summary_parts.append("No anomalies detected.")
+    if incomplete:
+        summary_parts.append(
+            "Analysis incomplete: "
+            + ", ".join(incomplete)
+            + " could not be evaluated; absence of anomalies is not established."
+        )
 
     summary = " ".join(summary_parts)
 
@@ -146,5 +159,6 @@ def generate_report(report: BehaviorReport, session: AnnotatedSession) -> Forens
         max_risk_score=session.max_risk_score,
         flags=flags,
         summary=summary,
+        analysis_complete=analysis_complete,
         timeline=timeline,
     )

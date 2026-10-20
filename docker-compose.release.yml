@@ -1,0 +1,129 @@
+services:
+  guardian:
+    image: ghcr.io/lukentony/ai-guardian-lab-guardian:${IMAGE_TAG:-1.4.0}
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    ports:
+      - "${GUARDIAN_BIND_IP:-127.0.0.1}:${GUARDIAN_PORT:-5000}:5000"
+    networks: [agent-net]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      API_KEY: ${API_KEY:?Set API_KEY in .env}
+      LOG_HMAC_KEY: ${LOG_HMAC_KEY:-}
+      TASK_API_KEY: ${TASK_API_KEY:-}
+      INTENT_LLM_MODEL: ${INTENT_LLM_MODEL:-ollama/deepseek-coder-v2:16b}
+      INTENT_LLM_TIMEOUT_SECONDS: "2"
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      DB_PATH: /var/lib/guardian/audit.db
+      LEARNED_PATH: /var/lib/guardian-learned/learned_patterns.yaml
+      SYSTEM_ONE_URL: ${SYSTEM_ONE_URL:-http://system-one:8009/v1/systemone}
+      SYSTEM_ONE_API_KEY: ${SYSTEM_ONE_API_KEY:-}
+      RATE_LIMIT_STORAGE_URI: ${RATE_LIMIT_STORAGE_URI:-memory://}
+    volumes:
+      - ./guardian/config:/app/guardian/config:ro
+      - ./state/audit:/var/lib/guardian
+      - ./state/learned:/var/lib/guardian-learned
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://localhost:5000/health', timeout=2)
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  agent:
+    image: ghcr.io/lukentony/ai-guardian-lab-agent:${IMAGE_TAG:-1.4.0}
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    ports:
+      - "127.0.0.1:${AGENT_PORT:-5001}:5001"
+    networks: [agent-net]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      GUARDIAN_URL: http://guardian:5000
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      LLM_MODEL_CODER: ${LLM_MODEL_CODER:-qwen2.5-coder:7b}
+      API_KEY: ${API_KEY:?Set API_KEY in .env}
+      EXECUTE_COMMANDS: ${EXECUTE_COMMANDS:-false}
+      EXECUTION_WORKSPACE: /workspace
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    tmpfs:
+      - "/workspace:rw,size=64m,uid=${LOCAL_UID:-1000},\
+        gid=${LOCAL_GID:-1000},mode=0700"
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 1024M
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://localhost:5001/health', timeout=2)
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      guardian:
+        condition: service_healthy
+
+  ui:
+    image: ghcr.io/lukentony/ai-guardian-lab-ui:${IMAGE_TAG:-1.4.0}
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    ports:
+      - "127.0.0.1:${UI_PORT:-8081}:8080"
+    networks: [agent-net]
+    environment:
+      GUARDIAN_URL: http://guardian:5000
+      GUARDIAN_API_KEY: ${API_KEY:?Set API_KEY in .env}
+      UI_USERNAME: ${UI_USERNAME:-guardian}
+      UI_PASSWORD: ${UI_PASSWORD:?Set UI_PASSWORD in .env}
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://localhost:8080/health', timeout=2)
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      guardian:
+        condition: service_healthy
+
+networks:
+  agent-net:
+    driver: bridge
