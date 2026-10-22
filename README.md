@@ -64,9 +64,10 @@ System One service; commands are still never executed. The profile is slower and
 uses small local models for a laptop-class installation.
 
 The System One service is now qualified for shadow-only use on CPU PyTorch
-2.13.0. The default 500 ms budget still does not fit the 0.8B model; the full
-profile uses a 2-second budget and records the measured latency. Enforcement
-remains disabled in both profiles.
+2.13.0. Qualification here means the pinned runtime starts and answers, not that
+the detection is validated. The default 500 ms budget still does not fit the
+0.8B model; the full profile uses a 2-second budget and records the measured
+latency. Enforcement remains disabled in both profiles.
 
 ## What 1.5 adds
 
@@ -106,7 +107,7 @@ favorable observation never skips L4. See [System One](docs/SYSTEM_ONE.md).
 
 The first candidate used torch 2.8 and was quarantined for security advisories
 and latency. The 1.6 full profile installs the reviewed torch 2.13.0 runtime and
-qualifies Kev for shadow use at a 2-second budget. The default 500 ms budget is
+qualifies the Kev runtime for shadow use with a 2-second request budget. The default 500 ms budget is
 still unmet; no threshold was selected and enforcement remains disabled.
 
 ## Command checks
@@ -193,8 +194,8 @@ them before they become policy.
 
 [Verification](docs/VERIFICATION.md) records the passing tests, the dependency
 audit, the qualified CPU experiment and the container checks run in a disposable
-Ubuntu 24.04 VM. GitHub CI also passed at the release commit. Synthetic fixtures
-cover regressions; they do not measure real-world detection accuracy.
+Ubuntu 24.04 VM. GitHub CI passed on `main` at `3a60310`; see Verification for the recorded
+run. Synthetic fixtures cover regressions; they do not measure real-world detection accuracy.
 
 Every executor needs a pre-execution hook. Asking a model to call Guardian is not
 enforcement. The task policy is not a complete filesystem or network sandbox,

@@ -10,7 +10,8 @@ skip L4, promote policy, train itself or execute tools. Configuration accepts on
 The bundled Kev CPU service is now qualified for **shadow-only** use on
 torch 2.13.0+cpu. It is a separate optional service, not part of the default
 three-container demo. The full profile starts it and a local reviewer, and is
-measurably slower than the demo.
+measurably slower than the demo. Qualification here means the pinned runtime
+starts and answers; it does not establish detection efficacy.
 
 Four independent typed questions assess task coherence, unauthorized transfer,
 following untrusted instructions and missing evidence. Questions have a SHA-256
@@ -35,6 +36,8 @@ Do not point it at an untrusted private service: it receives task context.
 The optional CPU service runs separately from Guardian's 512 MiB container. It
 has a dedicated key, no shell tools, no workspace/audit mounts and one admitted
 model job. A client disconnect does not admit more work until that job finishes.
+The service warms the model before `/health` becomes ready, so the first real
+request does not pay the cold-start cost.
 HTTP body limits and Uvicorn admission bounds also apply. Model files are cached
 separately; no implicit Hugging Face token or telemetry is used. Two threads are
 the old conservative default; the qualified profile uses eight through
@@ -48,7 +51,7 @@ unrelated to the PyPI ORM with the same name. Upstream Kev uses Apache-2.0;
 retain its notices when distributing it.
 
 Kev metadata still declares `torch>=2.6,<2.9`. The image installs torch first,
-then the hashed set, then Kev with `--no-deps`; the metadata cap therefore cannot
+then the pinned set, then Kev with `--no-deps`; the metadata cap therefore cannot
 silently replace the reviewed runtime. `system-one/qualification.py` verifies the
 installed torch and Kev versions at image build and service startup.
 
@@ -59,14 +62,15 @@ Hosted Jev would additionally require an explicit privacy/provider decision.
 ## Measured qualification
 
 The eight-case calibration set was run against the real local service without
-executing any candidate shell command. The full profile's 2-second budget was
-used for the observation; the model ran on CPU with eight threads and the prefix
-cache enabled.
+executing any candidate shell command. The reports used a 10 s diagnostic
+timeout; the configured full-profile request budget is 2 s, used separately by
+`demo --full`. The model ran on CPU with eight threads and the prefix cache
+enabled.
 
 | Calibration measurement | Result |
 | --- | --- |
 | Observed cases | 8/8 |
-| Within the full-profile 2 s budget | 8/8 |
+| Below 2 s in the latency comparison | 8/8 |
 | Within the unchanged 500 ms default budget | 0/8 |
 | End-to-end p50 | 1,214.625 ms |
 | End-to-end p95 | 1,289.89 ms |
@@ -87,14 +91,14 @@ required for routine unit tests.
 
 ## Startup gate
 
-`system-one/qualification.py` is the single startup gate. It requires
-`torch>=2.9,<2.14` and a Kev installation, and runs before the service imports
+`system-one/qualification.py` is the single startup gate. It requires exactly
+`torch 2.13.0` and `Kev 0.1.0`, and runs before the service imports
 torch, loads weights, downloads files or opens a socket. There is no environment
 variable bypass. The image runs the gate after installing dependencies; the
 bootstrap runs it after creating the isolated environment.
 
 The installed-environment audit was run with `pip-audit` against torch 2.13.0
-and the hashed lock. It reported no known vulnerabilities for either. The old
+and the pinned lock. It reported no known vulnerabilities for either. The old
 torch 2.8.0 set had eight advisories, including local memory-corruption and
 checkpoint-loading issues; that set is no longer the qualified runtime. Kev is
 not published on PyPI, so the auditor skips it; the source archive is pinned by

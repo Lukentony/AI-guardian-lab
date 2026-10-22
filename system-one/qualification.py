@@ -17,13 +17,12 @@ from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
 
-TORCH_MIN = (2, 9)
-TORCH_MAX_EXCLUSIVE = (2, 14)
-KEV_MIN = "0.1.0"
+TORCH_VERSION = (2, 13, 0)
+KEV_VERSION = (0, 1, 0)
 BLOCK_REASON = (
-    "Optional Kev service is not qualified for this runtime. It requires a "
-    "reviewed torch>=2.9,<2.14 installation and the pinned Kev archive; "
-    "see docs/SYSTEM_ONE.md. Guardian baseline operation is unaffected."
+    "Optional Kev service is not qualified for this runtime. It requires the "
+    "reviewed torch 2.13.0 and Kev 0.1.0 installation; see docs/SYSTEM_ONE.md. "
+    "Guardian baseline operation is unaffected."
 )
 
 
@@ -45,13 +44,13 @@ def require_qualified_runtime() -> None:
         installed_torch = version("torch")
     except PackageNotFoundError as exc:
         raise RuntimeError("PyTorch is not installed for the optional service") from exc
-    if not TORCH_MIN <= _release_tuple(installed_torch)[:2] < TORCH_MAX_EXCLUSIVE:
+    if _release_tuple(installed_torch) != TORCH_VERSION:
         raise RuntimeError(f"Unsupported torch {installed_torch}; {BLOCK_REASON}")
     try:
         installed_kev = version("kev")
     except PackageNotFoundError as exc:
         raise RuntimeError("The pinned Kev package is not installed") from exc
-    if _release_tuple(installed_kev) < _release_tuple(KEV_MIN):
+    if _release_tuple(installed_kev) != KEV_VERSION:
         raise RuntimeError(f"Unsupported kev {installed_kev}; {BLOCK_REASON}")
 
 
