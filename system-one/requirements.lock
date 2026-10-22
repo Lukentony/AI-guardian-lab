@@ -1,6 +1,6 @@
-# Historical quarantined dependency set: CPython 3.13, Linux x86_64.
-# Preserved for reproducibility; qualification.py blocks installation/startup.
-# Direct hashed CPU wheel avoids cross-index dependency confusion.
+# Qualified CPU dependency set: CPython 3.13, Linux x86_64.
+# torch and kev are installed explicitly by Dockerfile/bootstrap so the Kev
+# metadata cap (<2.9) cannot silently reintroduce torch 2.8.0.
 accelerate==1.15.0
 aiohappyeyeballs==2.7.1
 aiohttp==3.14.5
@@ -25,7 +25,6 @@ huggingface-hub==2.2.0
 idna==3.20
 jinja2==3.1.6
 joblib==1.6.0
-kev @ https://github.com/jaredpalmer/kev/archive/1f04cfa28e6a708485b28a9585010b9e436b776e.tar.gz#sha256=3d0230dbc5c6155cf6a0933696998a9ad6942754a2af1a95c88bf23e1d2cc631
 markdown-it-py==4.2.0
 markupsafe==3.0.3
 mdurl==0.1.2
@@ -60,7 +59,6 @@ sympy==1.14.0
 tenacity==9.2.1
 threadpoolctl==3.7.0
 tokenizers==0.23.3
-torch @ https://download-r2.pytorch.org/whl/cpu/torch-2.8.0%2Bcpu-cp313-cp313-manylinux_2_28_x86_64.whl#sha256=8f81dedb4c6076ec325acc3b47525f9c550e5284a18eae1d9061c543f7b6e7de
 tqdm==4.70.1
 transformers==5.20.1
 truststore==0.10.5

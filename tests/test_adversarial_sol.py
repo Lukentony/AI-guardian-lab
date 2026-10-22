@@ -771,7 +771,7 @@ def test_shadow_mode_cannot_implicitly_enable_enforcement(tmp_path, monkeypatch,
         system_one.load_config(path)
 
 
-@pytest.mark.parametrize("timeout", [True, 0.049, 1.001, float("nan")])
+@pytest.mark.parametrize("timeout", [True, 0.049, 5.001, float("nan")])
 def test_shadow_config_rejects_unbounded_timeouts(tmp_path, monkeypatch, timeout):
     monkeypatch.delenv("SYSTEM_ONE_URL", raising=False)
     path = tmp_path / "observer.yaml"
@@ -787,6 +787,23 @@ def test_shadow_config_rejects_unbounded_timeouts(tmp_path, monkeypatch, timeout
     )
     with pytest.raises(ValueError):
         system_one.load_config(path)
+
+
+def test_shadow_config_accepts_the_full_profile_budget(tmp_path, monkeypatch):
+    monkeypatch.delenv("SYSTEM_ONE_URL", raising=False)
+    monkeypatch.delenv("SYSTEM_ONE_TIMEOUT_SECONDS", raising=False)
+    path = tmp_path / "observer.yaml"
+    path.write_text(
+        yaml.safe_dump(
+            {
+                "mode": "shadow",
+                "endpoint": shadow_config().endpoint,
+                "model": "sol-model",
+                "timeout_seconds": 2.0,
+            }
+        )
+    )
+    assert system_one.load_config(path).timeout_seconds == 2.0
 
 
 @pytest.mark.parametrize(
@@ -847,7 +864,7 @@ def test_shadow_transport_has_no_proxy_redirect_retry_or_shared_key(monkeypatch)
     assert session.trust_env is False and session.post.call_count == 1
     kwargs = session.post.call_args.kwargs
     assert kwargs["allow_redirects"] is False and kwargs["stream"] is True
-    assert kwargs["timeout"] == (0.25, 0.25)
+    assert kwargs["timeout"] == (0.5, 0.5)
     assert kwargs["headers"] == {
         "Content-Type": "application/json",
         "Authorization": "Bearer sol-observer-only",
@@ -1070,6 +1087,8 @@ def test_evaluator_output_is_exclusive_and_cannot_execute(
 def test_deployment_static_is_nonroot_loopback_and_does_not_bake_secrets():
     services = yaml.safe_load((ROOT / "docker-compose.yml").read_text())["services"]
     for name, service in services.items():
+        if "build" not in service:
+            continue
         context = ROOT / service["build"]["context"]
         dockerfile = context / service["build"].get("dockerfile", "Dockerfile")
         lines = dockerfile.read_text().splitlines()

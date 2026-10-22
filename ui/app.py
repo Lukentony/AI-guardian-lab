@@ -19,7 +19,7 @@ app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024
 GUARDIAN_API = os.environ.get("GUARDIAN_URL", "http://guardian:5000")
 GUARDIAN_API_KEY = os.environ.get("GUARDIAN_API_KEY", "")
 AGENT_URL = os.environ.get("AGENT_URL", "http://agent:5001")
-APP_VERSION = os.environ.get("APP_VERSION", "1.5.0")
+APP_VERSION = os.environ.get("APP_VERSION", "1.6.0")
 
 DEMO_CASES = (
     {

@@ -1,8 +1,17 @@
 # Roadmap
 
-Version 1.5 rebuilds the browser interface around the decision trail. It
-remains a research lab. See [Verification](VERIFICATION.md) for measured results
-rather than treating this roadmap as a completion record.
+Version 1.6 adds a full local profile and qualifies the System One observer for
+shadow use. It remains a research lab. See [Verification](VERIFICATION.md) for
+measured results rather than treating this roadmap as a completion record.
+
+## Completed in 1.6
+
+- Full profile with Ollama, System One, `guardian-lab models` and
+  `guardian-lab demo --full`.
+- Kev on CPU torch 2.13.0, audited; the torch 2.8 quarantine is removed.
+- Observer timeout configurable up to 5 seconds; full profile uses 2 seconds.
+- Native full-stack verification: semantic review, System One observation,
+  forensics, dry-run Agent and a valid audit chain.
 
 ## Completed in 1.5
 
@@ -23,10 +32,11 @@ rather than treating this roadmap as a completion record.
   which targets are supported rather than experimental.
 - Verify persistent-state recovery on a long-lived host with backups.
 - Publish multi-architecture images and pin them by digest after qualification.
-- Find a compatible patched model runtime. The current Kev candidate requires a
-  vulnerable PyTorch range and is quarantined.
-- Evaluate a reviewed replacement on independent workloads. The measured CPU
-  candidate missed the 500 ms budget on every calibration case.
+- Build and verify the full profile in a Docker-capable VM, including the
+  System One image and model downloads.
+- The 0.8B observer still misses the default 500 ms budget; the full profile uses
+  2 seconds. Evaluate a faster backend or hardware before claiming the default.
+- Evaluate the observer on independent workloads and hold out the test split.
 - Add OS-level isolation before executing untrusted commands.
 - Define recovery for uncertain execution outcomes; the executor does not provide
   durable exactly-once execution.

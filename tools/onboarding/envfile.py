@@ -136,6 +136,35 @@ def validate_env(values: dict[str, str], profile: str = "demo") -> list[EnvIssue
             )
         )
 
+    numeric_ranges = {
+        "SYSTEM_ONE_TIMEOUT_SECONDS": (0.05, 5.0),
+        "INTENT_LLM_TIMEOUT_SECONDS": (0.0, 60.0),
+        "GUARDIAN_TIMEOUT_SECONDS": (0.0, 60.0),
+    }
+    for key, (low, high) in numeric_ranges.items():
+        raw = values.get(key)
+        if raw is None:
+            continue
+        try:
+            number = float(raw)
+        except ValueError:
+            issues.append(EnvIssue("error", key, "must be a number"))
+            continue
+        if key == "SYSTEM_ONE_TIMEOUT_SECONDS":
+            if not low <= number <= high:
+                issues.append(EnvIssue("error", key, "must be between 0.05 and 5"))
+        elif not low < number <= high:
+            issues.append(EnvIssue("error", key, f"must be between 0 and {high:g}"))
+    raw_threads = values.get("SYSTEM_ONE_THREADS")
+    if raw_threads is not None:
+        try:
+            threads = int(raw_threads)
+        except ValueError:
+            issues.append(EnvIssue("error", "SYSTEM_ONE_THREADS", "must be an integer"))
+        else:
+            if not 1 <= threads <= 16:
+                issues.append(EnvIssue("error", "SYSTEM_ONE_THREADS", "must be between 1 and 16"))
+
     bind = values.get("GUARDIAN_BIND_IP", "127.0.0.1")
     if bind not in {"127.0.0.1", "::1"}:
         issues.append(
@@ -151,7 +180,7 @@ def validate_env(values: dict[str, str], profile: str = "demo") -> list[EnvIssue
 
 def generate_env(profile: str, uid: int, gid: int) -> dict[str, str]:
     """Create deterministic, non-secret defaults with fresh credentials."""
-    if profile not in {"demo", "local-models"}:
+    if profile not in {"demo", "local-models", "full"}:
         raise EnvError(f"unknown profile {profile!r}")
 
     return {
@@ -163,11 +192,16 @@ def generate_env(profile: str, uid: int, gid: int) -> dict[str, str]:
         "UI_USERNAME": "guardian",
         "UI_PASSWORD": secrets.token_urlsafe(24),
         "LLM_PROVIDER": "ollama",
-        "OLLAMA_URL": "http://host.docker.internal:11434",
-        "LLM_MODEL_CODER": "qwen2.5-coder:7b",
-        "INTENT_LLM_MODEL": "ollama/deepseek-coder-v2:16b",
-        "LLM_MODEL_EXPLAIN": "deepseek-coder-v2:16b",
+        "COMPOSE_PROFILES": "full" if profile == "full" else "",
+        "OLLAMA_URL": "http://ollama:11434" if profile == "full" else "http://host.docker.internal:11434",
+        "LLM_MODEL_CODER": "qwen2.5-coder:3b" if profile == "full" else "qwen2.5-coder:7b",
+        "INTENT_LLM_MODEL": "ollama/qwen2.5:3b" if profile == "full" else "ollama/deepseek-coder-v2:16b",
+        "LLM_MODEL_EXPLAIN": "qwen2.5:3b" if profile == "full" else "deepseek-coder-v2:16b",
+        "INTENT_LLM_TIMEOUT_SECONDS": "30" if profile == "full" else "2",
+        "GUARDIAN_TIMEOUT_SECONDS": "15" if profile == "full" else "5",
         "SYSTEM_ONE_URL": "http://system-one:8009/v1/systemone",
+        "SYSTEM_ONE_TIMEOUT_SECONDS": "2.0" if profile == "full" else "0.5",
+        "SYSTEM_ONE_THREADS": "8",
         "GUARDIAN_BIND_IP": "127.0.0.1",
         "GUARDIAN_PORT": "5000",
         "AGENT_PORT": "5001",

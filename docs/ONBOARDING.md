@@ -67,8 +67,10 @@ The demo then checks that five decisions were appended to the signed audit and
 that the UI rejects anonymous access. It fails with a non-zero exit code if any
 expected decision changes.
 
-It does not prove model generation, semantic review quality, command execution,
-sandbox isolation or real detection accuracy.
+The default demo does not prove model generation, semantic review quality,
+command execution, sandbox isolation or real detection accuracy. The full
+profile exercises the model and observer paths, but its small models are not a
+quality benchmark and nothing is executed.
 
 ## Browser interface
 
@@ -92,6 +94,10 @@ command execution, no Docker socket and no database mount.
 - `local-models` uses the same stack but treats the Ollama endpoint and the
   configured reviewer model as required checks in `guardian-lab doctor`.
   `setup` never downloads a model automatically.
+- `full` starts Guardian, Agent, UI, Ollama and System One. It uses
+  `qwen2.5:3b` for semantic review and forensics, and `qwen2.5-coder:3b` for the
+  Agent. It needs about 16 GB of RAM, 8 CPU cores and 15 GB of free disk for
+  images and models. Commands are still never executed.
 
 To connect a local Ollama instance, edit `OLLAMA_URL`, `LLM_MODEL_CODER` and
 `INTENT_LLM_MODEL` in `.env`, then run:
@@ -103,13 +109,35 @@ To connect a local Ollama instance, edit `OLLAMA_URL`, `LLM_MODEL_CODER` and
 The probe checks that the Guardian container can reach the endpoint and that the
 configured reviewer model is present. It does not send a generation request.
 
+## Full profile
+
+```bash
+./guardian-lab setup --profile full
+./guardian-lab models
+./guardian-lab doctor
+./guardian-lab demo --full
+```
+
+`models` pulls the three configured models into the Ollama service; the first
+download can take several minutes. `doctor` then checks the models, the System
+One health endpoint, UI authentication, the audit API and the chain.
+`demo --full` runs deterministic allow and block cases, one semantic-review case,
+one forensics analysis and one dry-run Agent request. It also verifies that the
+observer recorded an actual observation rather than `unavailable`.
+
+The full profile uses a 2-second observer budget. The default 500 ms budget is
+still too tight for the 0.8B CPU model, so the default demo records `unavailable`
+instead of pretending the observer ran. The full profile is a demonstration, not
+a production latency claim.
+
 ## Diagnostics
 
 `guardian-lab doctor` checks configuration values, Docker, Compose `--wait`,
 ports, state directories, the three services, UI authentication, the audit API
-and the signature chain. `--json` prints the same checks with stable keys for
-scripts. Failures that block the demo return exit code 1; configuration errors
-return 2.
+and the signature chain. In the full profile it also checks Ollama, the configured
+models and the System One health endpoint. `--json` prints the same checks with
+stable keys for scripts. Failures that block the demo return exit code 1;
+configuration errors return 2.
 
 `doctor` does not print secrets. Hints name the setting to fix, not its value.
 

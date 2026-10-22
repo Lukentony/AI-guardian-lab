@@ -28,6 +28,7 @@ Regex searches have a 50 ms engine timeout. Timeout or invalid pattern state
 denies validation. Audit records use a transactional HMAC chain; redaction is
 best-effort and storage is not encrypted.
 
-The optional Kev CPU runtime is quarantined. Do not clear its startup gate until
-a compatible patched dependency set has passed review and evaluation. Current
-checks and remaining work are recorded in [Verification](VERIFICATION.md).
+The optional Kev CPU runtime is qualified for shadow use on torch 2.13.0 and is
+started only by the full profile. Do not change its gate, torch range or model
+without a new review and evaluation. Current checks and remaining work are
+recorded in [Verification](VERIFICATION.md).

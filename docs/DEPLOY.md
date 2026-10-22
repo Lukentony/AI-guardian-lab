@@ -1,8 +1,8 @@
 # Deployment
 
 The lab is for local research. Real execution still needs an OS-level sandbox;
-the supplied containers do not provide one. The optional Kev model service is
-quarantined because of a dependency security conflict.
+the supplied containers do not provide one. The optional Kev model service starts
+only in the full profile and is qualified for shadow use on torch 2.13.0.
 
 Use [Install](INSTALL.md) for first installation or upgrade. It covers credentials,
 Compose build contexts, state-directory ownership and audit migration. Follow it

@@ -14,13 +14,14 @@ services:
       LOG_HMAC_KEY: ${LOG_HMAC_KEY:-}
       TASK_API_KEY: ${TASK_API_KEY:-}
       INTENT_LLM_MODEL: ${INTENT_LLM_MODEL:-ollama/deepseek-coder-v2:16b}
-      INTENT_LLM_TIMEOUT_SECONDS: "2"
+      INTENT_LLM_TIMEOUT_SECONDS: ${INTENT_LLM_TIMEOUT_SECONDS:-2}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       FORENSICS_LLM_MODEL: ${LLM_MODEL_EXPLAIN:-deepseek-coder-v2:16b}
       DB_PATH: /var/lib/guardian/audit.db
       LEARNED_PATH: /var/lib/guardian-learned/learned_patterns.yaml
       SYSTEM_ONE_URL: ${SYSTEM_ONE_URL:-http://system-one:8009/v1/systemone}
       SYSTEM_ONE_API_KEY: ${SYSTEM_ONE_API_KEY:-}
+      SYSTEM_ONE_TIMEOUT_SECONDS: ${SYSTEM_ONE_TIMEOUT_SECONDS:-0.5}
       RATE_LIMIT_STORAGE_URI: ${RATE_LIMIT_STORAGE_URI:-memory://}
     volumes:
       - ./guardian/config:/app/guardian/config:ro
@@ -56,6 +57,7 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       GUARDIAN_URL: http://guardian:5000
+      GUARDIAN_TIMEOUT_SECONDS: ${GUARDIAN_TIMEOUT_SECONDS:-5}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
       LLM_MODEL_CODER: ${LLM_MODEL_CODER:-qwen2.5-coder:7b}
@@ -103,7 +105,7 @@ services:
       GUARDIAN_URL: http://guardian:5000
       GUARDIAN_API_KEY: ${API_KEY:?Set API_KEY in .env}
       AGENT_URL: http://agent:5001
-      APP_VERSION: ${IMAGE_TAG:-1.5.0}
+      APP_VERSION: ${IMAGE_TAG:-1.6.0}
       UI_USERNAME: ${UI_USERNAME:-guardian}
       UI_PASSWORD: ${UI_PASSWORD:?Set UI_PASSWORD in .env}
     security_opt: ["no-new-privileges:true"]
@@ -129,28 +131,66 @@ services:
       guardian:
         condition: service_healthy
   system-one:
-    profiles: [system-one]
+    profiles: [system-one, full]
     build:
       context: ./system-one
     networks: [agent-net]
     environment:
       SYSTEM_ONE_API_KEY: ${SYSTEM_ONE_API_KEY:-}
+      SYSTEM_ONE_THREADS: ${SYSTEM_ONE_THREADS:-8}
       HF_HUB_DISABLE_IMPLICIT_TOKEN: "1"
       HF_HUB_DISABLE_TELEMETRY: "1"
       HF_HOME: /models
-      OMP_NUM_THREADS: "2"
-      MKL_NUM_THREADS: "2"
+      KEV_PREFIX_CACHE: "4"
+      OMP_NUM_THREADS: ${SYSTEM_ONE_THREADS:-8}
+      MKL_NUM_THREADS: ${SYSTEM_ONE_THREADS:-8}
     volumes:
       - system-one-models:/models
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '8.0'
+          memory: 8G
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://localhost:8009/health', timeout=5)
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 300s
+  ollama:
+    profiles: [full]
+    image: ollama/ollama:0.40.8
+    networks: [agent-net]
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+    volumes:
+      - ollama-models:/root/.ollama
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
     deploy:
       resources:
         limits:
-          cpus: '2.0'
-          memory: 6G
+          cpus: '6.0'
+          memory: 12G
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
 networks:
   agent-net:
     driver: bridge
 volumes:
   system-one-models:
+  ollama-models:

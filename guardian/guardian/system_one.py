@@ -90,15 +90,21 @@ def load_config(path):
     endpoint = local_endpoint(os.getenv("SYSTEM_ONE_URL", data.get("endpoint", "")))
     model = data.get("model")
     timeout = data.get("timeout_seconds")
+    override = os.getenv("SYSTEM_ONE_TIMEOUT_SECONDS")
+    if override:
+        try:
+            timeout = float(override)
+        except ValueError as exc:
+            raise ValueError("SYSTEM_ONE_TIMEOUT_SECONDS must be a number") from exc
     if not isinstance(model, str) or not model or len(model) > 200:
         raise ValueError("A concrete System One model identifier is required")
     if (
         not isinstance(timeout, (int, float))
         or isinstance(timeout, bool)
         or not math.isfinite(timeout)
-        or not 0.05 <= timeout <= 1
+        or not 0.05 <= timeout <= 5
     ):
-        raise ValueError("System One timeout must be between 0.05 and 1 second")
+        raise ValueError("System One timeout must be between 0.05 and 5 seconds")
     return SystemOneConfig(mode, endpoint, model, float(timeout))
 
 
@@ -146,7 +152,9 @@ def observe(config, command, context, *, history=None, untrusted_output=""):
                 config.endpoint,
                 data=encoded,
                 headers=headers,
-                timeout=(config.timeout_seconds / 2, config.timeout_seconds / 2),
+                # Local connect is cheap; the read phase gets the full budget.
+                # The streaming loop below still enforces the total deadline.
+                timeout=(min(0.5, config.timeout_seconds), config.timeout_seconds),
                 allow_redirects=False,
                 stream=True,
             ) as response:

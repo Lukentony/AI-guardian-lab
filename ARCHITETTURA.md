@@ -1,8 +1,8 @@
 # AI Guardian Lab architecture
 
-This document describes release 1.5.0, based on v1.2.0, including the
-System One observer and the onboarding CLI. The lab does not provide a production
-sandbox.
+This document describes release 1.6.0, based on v1.2.0, including the
+System One observer, the onboarding CLI and the full local-profile demo. The lab
+does not provide a production sandbox.
 
 ## Context and boundaries
 
@@ -126,10 +126,16 @@ backend code holds the Guardian credential; browsers never receive it.
 Use TLS and an authenticated reverse proxy before any deliberate remote exposure.
 
 The optional System One profile has no published port, no workspace or audit
-mount, no execution tools and a separate key. Its current Kev/PyTorch candidate is
-quarantined: one source gate, `system-one/qualification.py`, blocks bootstrap,
-image dependency installation and service startup until the upstream dependency
-security conflict and qualification failures have been resolved.
+mount, no execution tools and a separate key. Its Kev service uses the reviewed
+CPU torch 2.13.0 runtime; `system-one/qualification.py` verifies the torch range
+and Kev installation at image build and service startup. The default 500 ms
+budget remains too tight for the 0.8B model; the full profile sets a 2-second
+budget and is explicitly slower. Enforcement remains disabled.
+
+The full profile also starts an Ollama service and uses small local models for
+the semantic reviewer, forensics and Agent generation. Models are pulled
+explicitly with `guardian-lab models`; they are not baked into images. Commands
+are still never executed.
 
 The client accepts only loopback, fixed local-service names or private-network
 inference URLs; redirects,
@@ -152,7 +158,8 @@ an archive only for a tag; the CI workflow runs offline regression, type, lint
 and Compose smoke tests. The onboarding job starts the stack, runs `doctor` and
 asserts the five demo decisions without executing a command.
 
-The current CPU candidate failed the observer's 500 ms latency budget in local
-calibration. Its PyTorch dependency also conflicts with security updates.
-Before a replacement can enforce decisions, it needs reviewed hardware and model
-choices, calibration, held-out evaluation and explicit rollout approval.
+The current CPU candidate passed observation at a 2-second full-profile budget
+and still misses the default 500 ms budget. Before it can enforce decisions, it
+needs reviewed hardware and model choices, calibration, held-out evaluation and
+explicit rollout approval. torch 2.8 remains excluded because of its eight
+advisories; torch 2.13.0 is the qualified shadow runtime.

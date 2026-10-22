@@ -34,7 +34,8 @@ UI and model keys. It sets the host UID/GID, uses `LLM_MODEL_CODER` consistently
 and leaves `EXECUTE_COMMANDS=false`. Keys are not printed. An existing `.env` or
 legacy audit database stops installation rather than being overwritten or migrated.
 The installer does not start the System One profile. For the shorter demo path,
-use `guardian-lab setup --profile demo` instead.
+use `guardian-lab setup --profile demo`; for the full local profile, use
+`guardian-lab setup --profile full`, then `guardian-lab models`.
 
 Configure a local Ollama service explicitly. Compose uses
 `http://host.docker.internal:11434` by default; both Guardian and Agent have the

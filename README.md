@@ -1,6 +1,6 @@
 # AI Guardian Lab
 
-![Version](https://img.shields.io/badge/version-1.5.0-blue)
+![Version](https://img.shields.io/badge/version-1.6.0-blue)
 ![Status](https://img.shields.io/badge/status-experimental-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -46,6 +46,28 @@ The demo page runs the same five cases as the CLI, shows the expected and actual
 decision, and reports the audit delta. No model is required. The same build also
 includes a read-only status page and the forensics report.
 
+## What 1.6 adds
+
+A `full` profile exercises every supported component, including the local model
+paths and the experimental observer:
+
+```bash
+./guardian-lab setup --profile full
+./guardian-lab models
+./guardian-lab doctor
+./guardian-lab demo --full
+```
+
+The full demo runs deterministic allow and block cases, a semantic-review case,
+one forensics analysis and one dry-run Agent request. It starts Ollama and the
+System One service; commands are still never executed. The profile is slower and
+uses small local models for a laptop-class installation.
+
+The System One service is now qualified for shadow-only use on CPU PyTorch
+2.13.0. The default 500 ms budget still does not fit the 0.8B model; the full
+profile uses a 2-second budget and records the measured latency. Enforcement
+remains disabled in both profiles.
+
 ## What 1.5 adds
 
 The browser interface is rebuilt around the decisions, not around the database:
@@ -82,11 +104,10 @@ It runs after the deterministic checks and before any required semantic review.
 It has no authority: it cannot approve, block or rewrite a command, and a
 favorable observation never skips L4. See [System One](docs/SYSTEM_ONE.md).
 
-The bundled CPU candidate did not pass qualification. All eight calibration cases
-missed the 500 ms budget, and it rated a harmless listing as high risk on data
-transfer. Its PyTorch dependency also conflicts with security updates, so the
-model service is quarantined before startup. The observer client, datasets and
-evaluation script are included; enforcement is not.
+The first candidate used torch 2.8 and was quarantined for security advisories
+and latency. The 1.6 full profile installs the reviewed torch 2.13.0 runtime and
+qualifies Kev for shadow use at a 2-second budget. The default 500 ms budget is
+still unmet; no threshold was selected and enforcement remains disabled.
 
 ## Command checks
 
@@ -132,12 +153,13 @@ signed operator-owned task context when available. Agent-supplied text does not
 become authorization. Inference must use a local or private endpoint; there is
 no hosted fallback.
 
-The bundled CPU candidate uses upstream Kev and `jaredpalmer/kev-0.8b@v1.0`.
-Its eight calibration cases took about three seconds each and all missed the
-500 ms budget. A smoke test also gave harmless `ls` a misleading high-risk score.
-Kev's PyTorch constraint conflicts with security updates, so its service is now
-**quarantined before installation or startup**. No enforcement threshold was set.
-See [System One](docs/SYSTEM_ONE.md) for the measurements and replacement criteria.
+The service uses upstream Kev and `jaredpalmer/kev-0.8b@v1.0` on CPU
+PyTorch 2.13.0. The eight calibration cases were observed at a p50 of about
+1.2 seconds with an explicit 2-second budget; the default 500 ms budget remains
+unmet. A smoke test still gave harmless `ls` a misleading high-risk score. The
+old torch 2.8 runtime had eight advisories and is no longer used. No enforcement
+threshold was set. See [System One](docs/SYSTEM_ONE.md) for the measurements and
+gate criteria.
 
 ## Running the lab
 
@@ -148,7 +170,8 @@ create a private `.env`.
 
 Default host ports are loopback-only: Guardian 5000, Agent 5001 and UI 8081.
 The UI requires Basic authentication and reads audit data through Guardian,
-without a SQLite mount. Neither path starts the optional model service.
+without a SQLite mount. The demo and the older installer do not start the model
+services; `setup --profile full` does.
 
 The [authenticated dry-run example](docs/API.md#authenticated-dry-run-example)
 validates a command without executing it. Real execution also requires a
@@ -169,7 +192,7 @@ them before they become policy.
 ## Checks and remaining work
 
 [Verification](docs/VERIFICATION.md) records the passing tests, the dependency
-audit, the failed CPU experiment and the container checks run in a disposable
+audit, the qualified CPU experiment and the container checks run in a disposable
 Ubuntu 24.04 VM. GitHub CI also passed at the release commit. Synthetic fixtures
 cover regressions; they do not measure real-world detection accuracy.
 
