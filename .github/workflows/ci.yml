@@ -45,6 +45,7 @@ jobs:
           API_KEY: ci-agent-key
           LOG_HMAC_KEY: ci-signing-key
           TASK_API_KEY: ci-operator-key
+          LLM_API_KEY: ci-model-key
           UI_PASSWORD: ci-ui-password
           EXECUTE_COMMANDS: "false"
         run: |
@@ -84,6 +85,7 @@ jobs:
         run: docker compose down
         env:
           API_KEY: ci-agent-key
+          LLM_API_KEY: ci-model-key
           UI_PASSWORD: ci-ui-password
 
   onboarding:
