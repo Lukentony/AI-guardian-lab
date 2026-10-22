@@ -19,6 +19,12 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://host.docker.internal:11434")
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
 LLM_MODEL_CODER = os.getenv("LLM_MODEL_CODER", "qwen2.5-coder:7b")
 API_KEY = os.getenv("API_KEY", "")
+try:
+    GUARDIAN_TIMEOUT = float(os.getenv("GUARDIAN_TIMEOUT_SECONDS", "5"))
+except ValueError:
+    GUARDIAN_TIMEOUT = 5.0
+if not 0 < GUARDIAN_TIMEOUT <= 60:
+    GUARDIAN_TIMEOUT = 5.0
 EXECUTE_COMMANDS = os.getenv("EXECUTE_COMMANDS", "false").lower() == "true"
 EXECUTION_WORKSPACE = os.getenv("EXECUTION_WORKSPACE", "/workspace")
 limiter = Limiter(
@@ -137,7 +143,7 @@ def execute():
             if not isinstance(task_id, str) or len(task_id) > 64:
                 return jsonify({"error": "Invalid task_id"}), 400
             response = call_guardian(
-                "GET", f"/tasks/{task_id}", headers=get_auth_headers(), timeout=5
+                "GET", f"/tasks/{task_id}", headers=get_auth_headers(), timeout=GUARDIAN_TIMEOUT
             )
             context = response.json()
             if not isinstance(context, dict) or context.get("trust") != "registered":
@@ -159,7 +165,11 @@ def execute():
         if task_id:
             validation_body["task_id"] = task_id
         response = call_guardian(
-            "POST", "/validate", json=validation_body, headers=get_auth_headers(), timeout=5
+            "POST",
+            "/validate",
+            json=validation_body,
+            headers=get_auth_headers(),
+            timeout=GUARDIAN_TIMEOUT,
         )
         validation = response.json()
         if not isinstance(validation, dict) or type(validation.get("approved")) is not bool:
@@ -191,7 +201,7 @@ def execute():
                 "/report",
                 json={"validation_id": validation_id, "command": command, "status": status},
                 headers=get_auth_headers(),
-                timeout=5,
+                timeout=GUARDIAN_TIMEOUT,
             )
         except (requests.RequestException, ValueError):
             # An uncertain outcome must remain visible. Never repeat the command

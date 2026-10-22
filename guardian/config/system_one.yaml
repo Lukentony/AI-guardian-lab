@@ -2,4 +2,6 @@
 mode: shadow
 endpoint: http://127.0.0.1:8009/v1/systemone
 model: kev-0.8b-v1.0
+# A full-profile .env may set SYSTEM_ONE_TIMEOUT_SECONDS=2.0 for a
+# slower synchronous observer. Keep 0.5 for the default path.
 timeout_seconds: 0.5

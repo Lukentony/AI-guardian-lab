@@ -258,7 +258,9 @@ def extract_json(text: str) -> dict:
 def check_intent_llm(command: str, task: str) -> dict:
     try:
         timeout = float(os.getenv("INTENT_LLM_TIMEOUT_SECONDS", "2"))
-        if not math.isfinite(timeout) or not 0 < timeout <= 3:
+        # The full profile runs a small local model on CPU/GPU. Keep a finite
+        # ceiling, but do not force the demo budget onto a slower reviewer.
+        if not math.isfinite(timeout) or not 0 < timeout <= 60:
             raise ValueError("Invalid semantic timeout")
         response = completion(
             model=os.getenv("INTENT_LLM_MODEL") or "ollama/deepseek-coder-v2:16b",

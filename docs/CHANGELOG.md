@@ -1,9 +1,25 @@
 # Changelog
 
 Entries below record earlier releases. Their original layer numbering and security
-claims are historical, not verification of release 1.5.0. The hardening work
+claims are historical, not verification of release 1.6.0. The hardening work
 uses L3 for deterministic intent mapping and L4 for semantic review. See
 [Verification](VERIFICATION.md) for current results.
+
+## [1.6.0] - 2026-10-22
+
+Adds a full local profile and qualifies the shadow observer.
+
+- Added `setup --profile full`, an Ollama service, System One and
+  `guardian-lab models`.
+- Added `guardian-lab demo --full`: deterministic allow/block, semantic review,
+  forensics and a dry-run Agent request in one non-executing run.
+- Replaced the quarantined torch 2.8 runtime with CPU torch 2.13.0 and the pinned
+  Kev archive. The startup gate now verifies the reviewed runtime.
+- Added a configurable observer timeout: 0.5 s default, 2 s full profile. The
+  0.8B model still misses 500 ms; the full profile records the measured latency.
+- Increased the Agent-to-Guardian timeout for the slower full profile.
+- Added full-profile configuration, orchestration and qualification tests.
+- No command execution is enabled by the full profile.
 
 ## [1.5.0] - 2026-10-20
 

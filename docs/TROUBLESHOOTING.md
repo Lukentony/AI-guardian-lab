@@ -40,9 +40,11 @@ do not work around the error by sharing the SQLite volume.
 
 ### The optional model will not start
 
-The Kev CPU service is quarantined because its PyTorch requirements conflict with
-security updates. This is intentional. See [System One](SYSTEM_ONE.md); do not
-bypass the gate or treat an unavailable observer as a safety verdict.
+The Kev CPU service starts only in the full profile. Its startup gate checks the
+reviewed torch 2.13 runtime and the pinned Kev package. If it does not start, run
+`guardian-lab doctor`, inspect the model download and the container logs, and do
+not bypass the gate. An unavailable observer is not a safety verdict. See
+[System One](SYSTEM_ONE.md).
 
 ## Italiano
 
@@ -82,6 +84,8 @@ credenziale del backend UI; non condividere il volume SQLite per aggirare l'erro
 
 ### Il modello opzionale non parte
 
-Il servizio Kev CPU è in quarantena: i suoi requisiti PyTorch sono incompatibili
-con gli aggiornamenti di sicurezza. Il blocco è intenzionale. Leggi
-[System One](SYSTEM_ONE.md), senza aggirare il controllo di avvio.
+Il servizio Kev CPU parte solo nel profilo full. Il controllo di avvio verifica
+il runtime torch 2.13 approvato e il pacchetto Kev bloccato. Se non parte, esegui
+`guardian-lab doctor`, controlla il download del modello e i log del container,
+senza aggirare il controllo. Un osservatore non disponibile non è un verdetto di
+sicurezza. Leggi [System One](SYSTEM_ONE.md).

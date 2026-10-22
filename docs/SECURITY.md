@@ -38,9 +38,10 @@ need a pre-execution hook, not a prompt asking the model to call the API. Comman
 and task classification do not provide complete filesystem or network isolation.
 
 A model's willingness to refuse a dangerous prompt is not a security boundary.
-System One is shadow-only. Its bundled Kev candidate is quarantined because of
-PyTorch advisories and an incompatible dependency constraint; it also failed the
-CPU latency qualification. See [System One](SYSTEM_ONE.md).
+System One is shadow-only. Its Kev service is qualified on CPU torch 2.13.0 and
+is disabled from enforcement. The default 500 ms budget still does not fit the
+0.8B model; the full profile uses a 2-second budget. See
+[System One](SYSTEM_ONE.md).
 
 Signing does not encrypt the database or protect a stolen key. Detecting deletion
 of a valid log suffix requires a trusted external checkpoint. Outcome reporting

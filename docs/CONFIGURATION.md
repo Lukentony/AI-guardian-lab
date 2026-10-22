@@ -30,6 +30,8 @@ will not verify earlier signatures. New installations create distinct keys.
 - `OLLAMA_URL`: explicit local/private model service address; the Compose default
   host-gateway address differs from a host shell's localhost.
 - `INTENT_LLM_MODEL`: bounded semantic reviewer used only when required.
+- `COMPOSE_PROFILES=full`: starts Ollama and System One for the full profile.
+- `GUARDIAN_TIMEOUT_SECONDS`: Agent-to-Guardian HTTP timeout; full profile uses 15.
 - `EXECUTE_COMMANDS=false`: default simulation; setting true is not a sandbox.
   Real execution also requires an operator-registered task_id and workspace.
 - `FAIL_CLOSED_ON_LLM_ERROR=false` no longer grants approval. Unavailable or
@@ -68,10 +70,12 @@ pattern state denies validation instead of silently losing protection.
 ## System One
 
 `guardian/config/system_one.yaml` accepts only `off` or `shadow`. Endpoint,
-concrete model identifier and a 0.05–1 second observer timeout are validated.
-`SYSTEM_ONE_URL` can override the local endpoint for Compose. There is no runtime
-auto-approval threshold. The bundled CPU service is quarantined; see
-[System One](SYSTEM_ONE.md) for the security conflict and measured limits.
+concrete model identifier and a 0.05–5 second observer timeout are validated.
+`SYSTEM_ONE_URL` can override the local endpoint for Compose.
+`SYSTEM_ONE_TIMEOUT_SECONDS` overrides the YAML timeout (default 0.5; full profile
+2.0). `SYSTEM_ONE_THREADS` controls the CPU service, default 8. There is no
+runtime auto-approval threshold. The service is qualified for shadow use on
+torch 2.13; see [System One](SYSTEM_ONE.md) for the measurements and limits.
 
 ## Persistence, ports and resources
 

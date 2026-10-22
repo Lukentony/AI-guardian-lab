@@ -77,9 +77,15 @@ def test_compose_static_security_and_build_contexts():
     assert services["ui"]["ports"][0].startswith("127.0.0.1:")
     assert "volumes" not in services["ui"]
     assert "ports" not in services["system-one"]
-    assert services["system-one"]["profiles"] == ["system-one"]
+    assert services["system-one"]["profiles"] == ["system-one", "full"]
+    assert services["ollama"]["profiles"] == ["full"]
+    assert "${INTENT_LLM_TIMEOUT_SECONDS" in services["guardian"]["environment"][
+        "INTENT_LLM_TIMEOUT_SECONDS"
+    ]
     assert " " not in services["agent"]["tmpfs"][0]
     for service in services.values():
+        if "build" not in service:
+            continue
         context = ROOT / service["build"]["context"]
         dockerfile = context / service["build"].get("dockerfile", "Dockerfile")
         assert dockerfile.is_file()
@@ -89,7 +95,7 @@ def test_compose_static_security_and_build_contexts():
                 assert (context / source).exists()
 
 
-def test_quarantined_model_startup_stops_before_import_or_network(tmp_path):
+def test_optional_model_gate_stops_before_import_or_network(tmp_path):
     result = subprocess.run(
         [sys.executable, str(ROOT / "system-one/serve.py")],
         env={"PATH": "/usr/bin:/bin"},
@@ -98,7 +104,7 @@ def test_quarantined_model_startup_stops_before_import_or_network(tmp_path):
         timeout=10,
     )
     assert result.returncode != 0
-    assert "quarantined" in result.stderr
+    assert "not installed" in result.stderr or "not qualified" in result.stderr
     assert "ModuleNotFoundError" not in result.stderr
     for filename in ("bootstrap.sh", "qualification.py"):
         shutil.copyfile(ROOT / "system-one" / filename, tmp_path / filename)
@@ -110,10 +116,10 @@ def test_quarantined_model_startup_stops_before_import_or_network(tmp_path):
         text=True,
         timeout=10,
     )
-    assert prepared.returncode != 0 and "quarantined" in prepared.stderr
+    assert prepared.returncode != 0
     assert not (tmp_path / ".venv").exists()
     dockerfile = (ROOT / "system-one/Dockerfile").read_text()
-    assert dockerfile.index("RUN python qualification.py") < dockerfile.index("RUN pip install")
+    assert dockerfile.index("RUN pip install") < dockerfile.index("RUN python qualification.py")
 
 
 def test_verifier_fails_for_missing_database(tmp_path):

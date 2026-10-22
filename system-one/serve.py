@@ -73,7 +73,14 @@ def main():
     os.environ["HF_HUB_DISABLE_IMPLICIT_TOKEN"] = "1"
     os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
     os.environ["KEV_TRUNCATE_STATES"] = "0"
-    os.environ["KEV_PREFIX_CACHE"] = "0"
+    # The authorization context is stable across requests. A small prefix cache
+    # keeps repeated observations warm without unbounded state growth.
+    os.environ.setdefault("KEV_PREFIX_CACHE", "4")
+    try:
+        threads = int(os.environ.get("SYSTEM_ONE_THREADS", "8"))
+    except ValueError:
+        threads = 8
+    threads = min(16, max(1, threads))
     import torch
     import uvicorn
     from kev.api import SystemOneRequest
@@ -82,7 +89,7 @@ def main():
 
     # CPU is intentional: do not silently consume another session's GPU or
     # guess ROCm support. GPU rollout needs separate hardware/latency validation.
-    torch.set_num_threads(2)
+    torch.set_num_threads(threads)
     checkpoint = Checkpoint(MODEL_RUN)
     tokenizer, model = checkpoint.load("cpu", LoadOptions.from_env())
     backend = Server(checkpoint, tokenizer, model, "cpu", truncate_states=False)

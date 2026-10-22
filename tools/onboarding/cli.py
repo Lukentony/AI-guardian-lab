@@ -17,9 +17,10 @@ from tools.onboarding.checks import (
     check_state_dirs,
     compose_up,
     create_state_dirs,
+    pull_models,
     run_doctor,
 )
-from tools.onboarding.demo import run_demo
+from tools.onboarding.demo import run_demo, run_full_demo
 from tools.onboarding.envfile import (
     EnvError,
     generate_env,
@@ -120,7 +121,11 @@ def _cmd_setup(args: argparse.Namespace) -> int:
     print("")
     print("Next steps:")
     print("  ./guardian-lab doctor")
-    print("  ./guardian-lab demo")
+    if args.profile == "full":
+        print("  ./guardian-lab models")
+        print("  ./guardian-lab demo --full")
+    else:
+        print("  ./guardian-lab demo")
     print(f"  Dashboard: http://127.0.0.1:{values.get('UI_PORT', '8081')}")
     print("Credentials are in .env; they are not shown here.")
     return 0
@@ -143,9 +148,20 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
     return 1 if failures else 0
 
 
+def _cmd_models(args: argparse.Namespace) -> int:
+    root, env_file, compose_file = _paths(args)
+    try:
+        values = read_env_file(env_file)
+    except EnvError as exc:
+        print(f"Cannot read {env_file}: {exc}", file=sys.stderr)
+        return 2
+    return pull_models(root, env_file, compose_file, values)
+
+
 def _cmd_demo(args: argparse.Namespace) -> int:
     root, env_file, compose_file = _paths(args)
-    return run_demo(
+    runner = run_full_demo if args.full else run_demo
+    return runner(
         root,
         env_file,
         compose_file,
@@ -167,7 +183,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     setup = subparsers.add_parser("setup", help="create .env and optional state directories")
-    setup.add_argument("--profile", choices=("demo", "local-models"), default="demo")
+    setup.add_argument("--profile", choices=("demo", "local-models", "full"), default="demo")
     setup.add_argument("--no-start", action="store_true", help="write configuration only")
     setup.add_argument(
         "--reuse", action="store_true", help="validate an existing .env instead of creating one"
@@ -181,12 +197,21 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="also probe Ollama reachability and model presence",
     )
-    doctor.add_argument("--profile", choices=("demo", "local-models"), default="demo")
+    doctor.add_argument(
+        "--profile",
+        choices=("demo", "local-models", "full"),
+        default=None,
+        help="override the profile stored in .env",
+    )
     doctor.set_defaults(func=_cmd_doctor)
+
+    models = subparsers.add_parser("models", help="pull the configured local models (full profile)")
+    models.set_defaults(func=_cmd_models)
 
     demo = subparsers.add_parser("demo", help="validate five fixed cases and inspect the audit")
     demo.add_argument("--no-start", action="store_true", help="do not start the stack")
     demo.add_argument("--no-build", action="store_true", help="reuse existing images")
+    demo.add_argument("--full", action="store_true", help="exercise models, System One and forensics")
     demo.set_defaults(func=_cmd_demo)
     return parser
 

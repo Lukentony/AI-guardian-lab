@@ -1,5 +1,62 @@
 # Verification record: hardening, onboarding and interface
 
+## 1.6.0 full-profile verification
+
+Scope: branch `feature/full-stack`, based on `7f3a2d6`. This is not a production
+approval. Model-based enforcement remains disabled and no remote deployment was
+performed.
+
+| Check | Observed result |
+| --- | --- |
+| Complete offline pytest suite | **390 passed**, no skips |
+| Application/scripts/tests/onboarding Pyright | 0 errors, 0 warnings |
+| Separate model-service Pyright project | 0 errors, 0 warnings |
+| Ruff on runtime surfaces, onboarding and tests | Passed |
+| System One runtime | Kev 0.8B on CPU torch 2.13.0, eight threads, prefix cache |
+| Calibration at the full-profile 2 s budget | 8/8 observed; p50 **1,214.625 ms**; p95 **1,289.89 ms** |
+| Calibration at the unchanged 500 ms default | 0/8 |
+| Mean per-question Brier score | **0.228625120625** on the handcrafted set |
+| `pip-audit` against torch 2.13.0 and the hashed lock | No known vulnerabilities |
+| Native full stack: Guardian, Agent, UI, Ollama, System One | All health checks passed |
+| Three `/validate` cases | Allow, block and semantic review all matched; System One was `observed` on the two non-baseline cases |
+| Agent dry-run | `simulated`; no command executed |
+| Forensics | `analysis_complete=true` with the local model |
+| Audit after the three cases | +3 decisions; chain verifier reported 15 signed rows and no errors |
+| UI authentication | 401 without credentials, 200 with credentials |
+| `guardian-lab demo --full` orchestration | PASS against the native stack and PASS again in the Docker VM |
+| Full-profile Docker build and VM run | PASS in the disposable Ubuntu 24.04 VM; five services healthy, models present, demo 3/3 |
+| System One container runtime | Python 3.13.17, torch **2.13.0+cpu**, Kev health observable |
+
+The native stack used `qwen2.5:3b` for semantic review and forensics and
+`qwen2.5-coder:3b` for the Agent, with System One on the pinned Kev checkpoint.
+The full demo's `check_models` and `check_system_one` functions were replaced by
+successful checks for that native run; the underlying HTTP services and model
+calls were exercised directly.
+
+The same source tree was then copied to the disposable Ubuntu 24.04 VM. Docker
+29.1.3 and Compose 2.40.3 built the System One image (torch 2.13.0+cpu, Kev
+pinned), pulled `ollama/ollama:0.40.8`, and reached healthy for Guardian, Agent,
+UI, Ollama and System One. `guardian-lab models` pulled both 3B models;
+`guardian-lab doctor` reported every check ok, including the observer endpoint;
+`guardian-lab demo --full` passed 3/3 cases with a valid chain. The Agent ran in
+dry-run and the audit showed no `executed` rows.
+
+The first Docker run exposed two integration defects:
+
+1. `doctor` defaulted to the demo profile and skipped models and System One even
+   when `.env` said `full`. It now reads `GUARDIAN_PROFILE` unless the flag
+   overrides it.
+2. Compose hard-coded `INTENT_LLM_TIMEOUT_SECONDS=2`, overriding the full-profile
+   value of 30. The semantic case therefore failed as `llm_error`. Compose now
+   interpolates the setting.
+
+Both fixes were applied and the full demo was rerun successfully. The published
+1.6.0 release archive and GHCR release images were not built in this session;
+the source build above is the verified path.
+
+The historical 1.5.0 record follows. It is retained for context; its quarantine
+statements describe the previous torch 2.8 candidate, not this release.
+
 Scope: release 1.5.0, published from branch `feature/system-one-hardening` and
 based on `15b6f6672a6a12546e25e795d66a91919c93f02f`. This is not a production
 approval. Model-based enforcement remains disabled and no remote deployment was
@@ -238,8 +295,8 @@ repeat evaluation. The recorded local runtime is no longer permitted to start.
 | Blocker/limit | Practical next step | Owner |
 | --- | --- | --- |
 | Target-host deployment | Repeat the smoke check on the intended host, then verify backups, UID/GID ownership and recovery there | Deployment owner |
-| Kev/PyTorch security incompatibility | Obtain a compatible patched upstream release or choose another licensed/privacy-reviewed backend; audit, test and requalify before clearing the startup gate | Integration maintainer, with upstream dependency support |
-| CPU latency and unreliable scores | Benchmark the reviewed replacement/hardware on independent labelled calibration and untouched held-out workloads; do not loosen thresholds merely to pass | Evaluation owner |
+| Full-profile Docker build and VM run | Build the System One image, start the full profile, pull the models and repeat `demo --full` in a disposable Docker host | Integration maintainer |
+| CPU latency and unreliable scores | The 2 s full-profile budget is qualified for shadow use; the 500 ms default still fails. Benchmark on independent labelled calibration and untouched held-out workloads; do not loosen thresholds merely to pass | Evaluation owner |
 | No production sandbox or durable exactly-once executor | Supply and verify OS-level isolation and recovery semantics before any real untrusted execution | Deployment/security owner |
 
 The GitHub workflow pins actions by commit and includes ordinary-service Compose

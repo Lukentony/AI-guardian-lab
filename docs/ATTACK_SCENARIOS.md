@@ -70,5 +70,5 @@ steps can combine into a harmful sequence, and the current argument/task policy
 is not a complete sandbox. Kernel exploits and container escapes require separate
 isolation controls.
 
-See [Verification](VERIFICATION.md) for regression results and the quarantined
-model runtime, and [Architecture](../ARCHITETTURA.md) for the trust boundaries.
+See [Verification](VERIFICATION.md) for regression results and the qualified
+shadow observer, and [Architecture](../ARCHITETTURA.md) for the trust boundaries.

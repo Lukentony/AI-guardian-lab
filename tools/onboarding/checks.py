@@ -488,6 +488,18 @@ def check_audit_chain(root: Path, values: dict[str, str]) -> list[Check]:
     ]
 
 
+def _configured_models(values: dict[str, str]) -> list[str]:
+    models: list[str] = []
+    for key in ("INTENT_LLM_MODEL", "LLM_MODEL_EXPLAIN", "LLM_MODEL_CODER"):
+        value = values.get(key, "").strip()
+        if not value:
+            continue
+        name = value.split("/", 1)[-1] if value.startswith("ollama/") else value
+        if name and name not in models:
+            models.append(name)
+    return models
+
+
 def check_models(
     root: Path,
     env_file: Path,
@@ -496,8 +508,8 @@ def check_models(
     stack_running: bool,
 ) -> list[Check]:
     profile = values.get("GUARDIAN_PROFILE", "demo")
-    required = profile == "local-models"
-    model = values.get("INTENT_LLM_MODEL", "").split("/", 1)[-1]
+    required = profile in {"local-models", "full"}
+    models = _configured_models(values)
 
     names: list[str] | None = None
     source = "container"
@@ -535,23 +547,102 @@ def check_models(
                 False,
                 required,
                 "Ollama is not reachable",
-                "Start Ollama or set OLLAMA_URL; semantic checks will deny ambiguous commands.",
+                "Start the full profile or set OLLAMA_URL; semantic checks deny ambiguous commands.",
             )
         ]
 
     checks = [Check("models", "endpoint", True, required, f"reachable ({source} probe)")]
-    found = model in names or any(name.split(":", 1)[0] == model.split(":", 1)[0] for name in names)
-    checks.append(
-        Check(
-            "models",
-            "reviewer model",
-            found,
-            required,
-            f"{model} {'is present' if found else 'is missing'}",
-            "Pull the configured INTENT_LLM_MODEL or choose a smaller local model.",
+    for model in models:
+        found = model in names or any(
+            name.split(":", 1)[0] == model.split(":", 1)[0] for name in names
         )
-    )
+        checks.append(
+            Check(
+                "models",
+                model,
+                found,
+                required,
+                f"{model} {'is present' if found else 'is missing'}",
+                "Run guardian-lab models to pull the configured local models.",
+            )
+        )
     return checks
+
+
+def pull_models(
+    root: Path,
+    env_file: Path,
+    compose_file: Path,
+    values: dict[str, str],
+    out=print,
+) -> int:
+    """Pull the configured local models into the full-profile Ollama service."""
+    if values.get("GUARDIAN_PROFILE") != "full":
+        out("Model pull is only available for the full profile.")
+        return 2
+    models = _configured_models(values)
+    if not models:
+        out("No local models are configured.")
+        return 2
+    for model in models:
+        out(f"Pulling {model} (this can take several minutes) ...")
+        code, stdout, stderr = run_compose(
+            root,
+            env_file,
+            compose_file,
+            ["exec", "-T", "ollama", "ollama", "pull", model],
+            timeout=3600,
+        )
+        if code != 0:
+            out(f"Could not pull {model}: {stderr or stdout or 'compose failed'}")
+            return 1
+    out("Local models are ready.")
+    return 0
+
+
+def check_system_one(
+    root: Path,
+    env_file: Path,
+    compose_file: Path,
+    values: dict[str, str],
+    stack_running: bool,
+) -> list[Check]:
+    profile = values.get("GUARDIAN_PROFILE", "demo")
+    required = profile == "full"
+    if not stack_running:
+        return [
+            Check(
+                "system-one",
+                "observer",
+                False,
+                required,
+                "stack is not running",
+                "Start the full profile, then run guardian-lab doctor again.",
+            )
+        ]
+    script = (
+        "import json,urllib.request;"
+        "print(urllib.request.urlopen('http://system-one:8009/health',timeout=10).read().decode())"
+    )
+    code, out, err = run_compose(
+        root,
+        env_file,
+        compose_file,
+        ["exec", "-T", "guardian", "python", "-c", script],
+        timeout=30,
+    )
+    ok = code == 0 and bool(out)
+    detail = "reachable" if ok else (err or out or "health check failed")
+    return [
+        Check(
+            "system-one",
+            "observer",
+            ok,
+            required,
+            detail,
+            "The first Kev start downloads weights; wait for the health check.",
+        )
+    ]
 
 
 def check_compose_config(root: Path, env_file: Path, compose_file: Path) -> list[Check]:
@@ -574,7 +665,7 @@ def run_doctor(
     root: Path,
     env_file: Path,
     compose_file: Path,
-    profile: str,
+    profile: str | None,
     probe_models: bool,
 ) -> list[Check]:
     try:
@@ -591,6 +682,7 @@ def run_doctor(
             )
         ]
 
+    profile = values.get("GUARDIAN_PROFILE", profile or "demo")
     checks: list[Check] = []
     checks.extend(check_env(values, profile))
     checks.extend(check_docker())
@@ -604,8 +696,10 @@ def run_doctor(
     checks.extend(check_audit_chain(root, values))
 
     stack_running = all(check.ok for check in health)
-    if probe_models:
+    if probe_models or profile == "full":
         checks.extend(check_models(root, env_file, compose_file, values, stack_running))
+    if profile == "full":
+        checks.extend(check_system_one(root, env_file, compose_file, values, stack_running))
     return checks
 
 

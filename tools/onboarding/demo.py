@@ -11,6 +11,8 @@ from tools.onboarding.checks import (
     Check,
     base_url,
     check_audit_chain,
+    check_models,
+    check_system_one,
     check_ui_auth,
     compose_up,
     fetch_audit,
@@ -27,6 +29,8 @@ class DemoCase:
     command: str
     task: str
     approved: bool
+    expected_source: str = ""
+    expected_system_one: str = ""
 
 
 @dataclass
@@ -36,11 +40,45 @@ class DemoResult:
     source: str
     reason: str
     error: str = ""
+    system_one: str = ""
 
     @property
     def ok(self) -> bool:
-        return not self.error and self.approved is self.case.approved
+        if self.error or self.approved is not self.case.approved:
+            return False
+        if self.case.expected_source and self.source != self.case.expected_source:
+            return False
+        return not (
+            self.case.expected_system_one
+            and self.system_one != self.case.expected_system_one
+        )
 
+
+FULL_CASES = (
+    DemoCase(
+        "Deterministic allow",
+        "ls /tmp",
+        "List files in the temporary directory",
+        True,
+        expected_source="mapping",
+        expected_system_one="observed",
+    ),
+    DemoCase(
+        "Deterministic block",
+        "rm LICENSE",
+        "Read the license file",
+        False,
+        expected_system_one="not_run_baseline_rejected",
+    ),
+    DemoCase(
+        "Semantic review",
+        "ls /tmp > /tmp/list.txt",
+        "List the files and save the result",
+        True,
+        expected_source="llm",
+        expected_system_one="observed",
+    ),
+)
 
 CASES = (
     DemoCase("Allowed listing", "ls /tmp", "List files in the temporary directory", True),
@@ -205,4 +243,186 @@ def run_demo(
     out(f"Result:   {'PASS' if passed else 'FAIL'} ({sum(item.ok for item in results)}/{len(results)} cases)")
     if not passed:
         out("Inspect the failed row and run guardian-lab doctor.")
+    return 0 if passed else 1
+
+
+FORENSICS_SAMPLE = "\n".join(
+    (
+        '{"role": "user", "content": "List files in /tmp"}',
+        '{"role": "assistant", "content": "", "tool_calls": [{"id": "c1", "function": {"name": "bash", "arguments": "{\\"command\\": \\"ls /tmp\\"}"}}]}',
+        '{"role": "tool", "tool_call_id": "c1", "content": "file1.txt"}',
+    )
+) + "\n"
+
+
+def _headers(values: dict[str, str]) -> dict[str, str]:
+    return {"X-API-Key": values.get("API_KEY", "")}
+
+
+def _forensics_check(values: dict[str, str], out: Callable[[str], None]) -> bool:
+    result = http_post_json(
+        base_url(values, "GUARDIAN_PORT") + "/forensics/analyze",
+        {"jsonl": FORENSICS_SAMPLE},
+        headers=_headers(values),
+        timeout=120,
+    )
+    if result is None:
+        out("Forensics: Guardian is unreachable")
+        return False
+    status, payload = result
+    if status != 200 or not isinstance(payload, dict):
+        out(f"Forensics: HTTP {status}")
+        return False
+    complete = payload.get("analysis_complete") is True
+    out(f"Forensics: {'complete' if complete else 'incomplete'}")
+    return complete
+
+
+def _agent_check(values: dict[str, str], out: Callable[[str], None]) -> bool:
+    result = http_post_json(
+        base_url(values, "AGENT_PORT") + "/execute",
+        {"task": "List files in /tmp"},
+        headers=_headers(values),
+        timeout=120,
+    )
+    if result is None:
+        out("Agent: unreachable")
+        return False
+    status, payload = result
+    if status != 200 or not isinstance(payload, dict):
+        out(f"Agent: HTTP {status}")
+        return False
+    simulated = payload.get("status") == "simulated"
+    out(f"Agent: {payload.get('status', 'unknown')}")
+    return simulated and not payload.get("execution_may_have_occurred", False)
+
+
+def run_full_demo(
+    root: Path,
+    env_file: Path,
+    compose_file: Path,
+    start: bool = True,
+    build: bool = True,
+    values: dict[str, str] | None = None,
+    out: Callable[[str], None] = print,
+) -> int:
+    """Exercise every supported component, including the local reviewer and observer."""
+    if values is None:
+        try:
+            values = read_env_file(env_file)
+        except Exception as exc:
+            out(f"Configuration error: {exc}")
+            return 2
+    assert values is not None
+    profile = values.get("GUARDIAN_PROFILE", "demo")
+    if profile != "full":
+        out("The full demo requires GUARDIAN_PROFILE=full.")
+        return 2
+    errors = [issue for issue in validate_env(values, profile) if issue.level == "error"]
+    if errors:
+        out("Configuration is not ready:")
+        for issue in errors:
+            out(f"  {issue.key}: {issue.message}")
+        return 2
+
+    out("AI Guardian Lab full demo")
+    out("Commands are validated, never executed. The Agent runs in dry-run.")
+
+    health = http_get_json(base_url(values, "GUARDIAN_PORT") + "/health")
+    if health is None or health[0] != 200:
+        if not start:
+            out("Guardian is not running. Start the stack or omit --no-start.")
+            return 1
+        out("Starting the full lab. The first build can take several minutes.")
+        if compose_up(root, env_file, compose_file, build=build) != 0:
+            if not _wait_for_guardian(values):
+                out("The stack did not start. Check: docker compose logs --tail=100 guardian")
+                return 1
+        if not _wait_for_guardian(values):
+            out("Guardian did not become healthy in time.")
+            return 1
+
+    model_checks = check_models(root, env_file, compose_file, values, True)
+    model_failures = [item for item in model_checks if not item.ok and item.required]
+    if model_failures:
+        out("Local models are not ready:")
+        for item in model_failures:
+            out(f"  {item.component}/{item.name}: {item.detail}")
+        out("Run: ./guardian-lab models")
+        return 1
+    observer_checks = check_system_one(root, env_file, compose_file, values, True)
+    if any(not item.ok for item in observer_checks):
+        out("System One is not ready:")
+        for item in observer_checks:
+            if not item.ok:
+                out(f"  {item.detail}")
+        return 1
+
+    before = fetch_audit(values)
+    if before is None:
+        out("The audit API is not available. Run guardian-lab doctor.")
+        return 1
+    stats = before.get("stats", {})
+    before_total = stats.get("total", 0) if isinstance(stats, dict) else 0
+
+    results: list[DemoResult] = []
+    for case in FULL_CASES:
+        payload, error = _validate(values, case)
+        if payload is None:
+            results.append(DemoResult(case, None, "", "", error))
+            continue
+        approved = payload.get("approved")
+        assert isinstance(approved, bool)
+        observation = payload.get("system_one")
+        status = observation.get("status") if isinstance(observation, dict) else ""
+        results.append(
+            DemoResult(
+                case,
+                approved,
+                str(payload.get("intent_source", "")),
+                str(payload.get("reason", "")),
+                "",
+                str(status or ""),
+            )
+        )
+    _print_table(results, out)
+
+    after = fetch_audit(values)
+    audit_ok = False
+    audit_detail = "audit API unavailable"
+    if after is not None:
+        stats = after.get("stats", {})
+        after_total = stats.get("total", 0) if isinstance(stats, dict) else 0
+        delta = after_total - before_total if isinstance(before_total, int) else 0
+        audit_ok = delta == len(FULL_CASES)
+        audit_detail = f"+{delta} decisions (expected +{len(FULL_CASES)})"
+
+    forensics_ok = _forensics_check(values, out)
+    agent_ok = _agent_check(values, out)
+
+    checks = check_audit_chain(root, values)
+    chain = _find_check(checks, "signature chain")
+    if not (root / "state/audit/audit.db").is_file():
+        chain_ok = False
+        chain_detail = "audit database not found on the host"
+    else:
+        chain_ok = chain is not None and chain.ok
+        chain_detail = chain.detail if chain is not None else "not checked"
+    ui_checks = check_ui_auth(values)
+    ui = _find_check(ui_checks, "authentication")
+    ui_ok = ui is not None and ui.ok
+
+    out("")
+    out(f"Audit:     {audit_detail}")
+    out(f"Chain:     {'valid' if chain_ok else 'FAILED'}; {chain_detail}")
+    if ui is not None:
+        out(f"UI:        {'ok' if ui_ok else 'FAILED'}; {ui.detail}")
+    out(f"Forensics: {'ok' if forensics_ok else 'FAILED'}")
+    out(f"Agent:     {'ok' if agent_ok else 'FAILED'}")
+
+    passed = all(item.ok for item in results) and audit_ok and chain_ok and ui_ok and forensics_ok and agent_ok
+    out("")
+    out(f"Result:    {'PASS' if passed else 'FAIL'} ({sum(item.ok for item in results)}/{len(results)} cases)")
+    if not passed:
+        out("Inspect the failed component and run guardian-lab doctor.")
     return 0 if passed else 1

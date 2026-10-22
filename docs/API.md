@@ -149,8 +149,9 @@ before any retry. Exactly-once execution is not provided.
 UI uses Basic authentication (`UI_USERNAME`, `UI_PASSWORD`) on loopback port
 8081; `/health` alone is public. It does not expose the backend API credential.
 The optional model service uses a dedicated bearer key for `/v1/systemone` and
-publishes no host port in Compose. Its Kev runtime is **quarantined** until a
-compatible security update is available; see [System One](SYSTEM_ONE.md).
+publishes no host port in Compose. Its Kev runtime is qualified for shadow use on
+torch 2.13.0 and starts only in the full profile; see
+[System One](SYSTEM_ONE.md).
 
 ## Authenticated dry-run example
 
