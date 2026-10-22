@@ -5,7 +5,7 @@
     <div>
         <p class="eyebrow">Live control room</p>
         <h1>One command, one visible decision.</h1>
-        <p class="lede">Type a task and a proposed shell command. Guardian runs the same authenticated path as the API: parser, policy, optional observer, semantic review and signed audit. Nothing is executed here.</p>
+        <p class="lede">Type a task and a proposed shell command. Guardian runs the same authenticated path as the API: parser, policy, optional observer, semantic review and signed audit. Nothing runs until you explicitly press Execute in sandbox.</p>
     </div>
     <div class="actions">
         <a class="btn" href="/status">System status</a>
@@ -97,6 +97,22 @@
                 <div><dt>Execution</dt><dd id="decision-execution">Not executed</dd></div>
                 <div><dt>Sandbox</dt><dd id="decision-sandbox">Not configured in this demo</dd></div>
             </dl>
+        </section>
+
+        <section class="panel execution-panel" id="execution-panel" hidden aria-labelledby="execution-title">
+            <header class="panel-head">
+                <div>
+                    <p class="eyebrow">Sandbox</p>
+                    <h2 id="execution-title">Execute only this approved command</h2>
+                    <p>Hardened container: non-root, no network, read-only root, tmpfs workspace, five-second timeout.</p>
+                </div>
+                <span class="chip chip-idle" id="execution-state">Ready</span>
+            </header>
+            <div class="btn-row">
+                <button class="btn btn-primary" type="button" id="execute-command">Execute in sandbox</button>
+                <span class="hint">The token is bound to this command and expires in 60 seconds.</span>
+            </div>
+            <pre class="execution-output" id="execution-output" hidden aria-live="polite"></pre>
         </section>
 
         <div class="console-grid">

@@ -85,8 +85,9 @@ decisions and links to:
 - **Status**: Guardian, Agent and audit reachability. It does not check Docker,
   llama.cpp or the signing key; use `guardian-lab doctor` for those.
 
-The interface is read-only apart from the demo and forensics POSTs. It has no
-command execution, no Docker socket and no database mount.
+The interface is read-only apart from the demo, forensics and the explicit
+sandbox execution. The browser never receives the executor key or the Docker
+socket; the UI server holds the Guardian credential.
 
 ## Profiles
 
@@ -95,10 +96,11 @@ command execution, no Docker socket and no database mount.
   experience.
 - `local-models` is retained for an externally managed OpenAI-compatible
   endpoint; it is not the supported full profile.
-- `full` starts Guardian, Agent, UI, llama.cpp and System One. It uses one
-  pinned `qwen2.5-3b-instruct` GGUF for semantic review, forensics and command
-  generation. It needs about 16 GB of RAM, 8 CPU cores and 15 GB of free disk for
-  images and the model. Commands are still never executed.
+- `full` starts Guardian, Agent, UI, llama.cpp, System One and the optional
+  sandbox executor. It uses one pinned `qwen2.5-3b-instruct` GGUF for semantic
+  review, forensics and command generation. It needs about 16 GB of RAM, 8 CPU
+  cores and 15 GB of free disk for images and the model. The CLI demo does not
+  execute; the Control room can execute one approved command in the sandbox.
 
 The full profile is local-only. A remote OpenAI-compatible endpoint can be
 configured explicitly with `LLM_API_BASE` and `LLM_API_KEY`, but it sends task
@@ -124,6 +126,13 @@ observer recorded an actual observation rather than `unavailable`. The Agent
 check accepts `simulated` or `rejected`: both prove the Agent-to-Guardian path,
 but only `simulated` covers approval through simulation and outcome reporting.
 
+The Control room is the execution demo. After an explicit click, the UI sends
+the approved command and a 60-second token to the executor. The executor is a
+non-root container with a read-only root filesystem, tmpfs workspace, no external
+network, dropped capabilities, a five-second timeout and one-use tokens. It
+records the terminal outcome back through Guardian. It is a hardened container,
+not a microVM; a kernel or container escape remains outside this guarantee.
+
 The full profile uses a 2-second observer budget. The default 500 ms budget is
 still too tight for the 0.8B CPU model, so the default demo records `unavailable`
 instead of pretending the observer ran. The full profile is a demonstration, not
@@ -134,7 +143,8 @@ a production latency claim.
 `guardian-lab doctor` checks configuration values, Docker, Compose `--wait`,
 ports, state directories, the three services, UI authentication, the audit API
 and the signature chain. In the full profile it also checks the pinned GGUF,
-the llama.cpp endpoint and served alias, and the System One health endpoint.
+the llama.cpp endpoint and served alias, the System One health endpoint and the
+executor health endpoint.
 `--json` prints the same checks with stable keys for scripts. Failures that block the demo return exit code 1;
 configuration errors return 2.
 

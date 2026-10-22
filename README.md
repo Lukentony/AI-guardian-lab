@@ -38,7 +38,8 @@ matrix and troubleshooting.
 
 The control room shows one live decision: parser, policy, shadow observer,
 semantic reviewer (when needed), signed receipt and the evidence behind the
-result. Nothing is executed; the sandbox panel is explicit about that.
+result. A second explicit click can run the approved command in a hardened,
+network-isolated container. Execution is never automatic.
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
@@ -65,10 +66,16 @@ paths and the experimental observer:
 ```
 
 The full demo runs deterministic allow and block cases, a semantic-review case,
-one forensics analysis and one dry-run Agent request. It starts llama.cpp and the
-System One service; commands are still never executed. The profile is slower and
-uses a pinned 3B GGUF for a laptop-class installation. It is local-only; a
-remote OpenAI-compatible endpoint is not a supported demo profile.
+one forensics analysis and one dry-run Agent request. It starts llama.cpp, the
+System One service and the optional sandbox executor; the CLI demo itself never
+executes. The profile is slower and uses a pinned 3B GGUF for a laptop-class
+installation. It is local-only; a remote OpenAI-compatible endpoint is not a
+supported demo profile.
+
+The Control room adds the visual path: one approved command can be executed after
+a second explicit click in a non-root, network-isolated, read-only container. The
+authorization token is bound to that command, expires after 60 seconds and can be
+used once.
 
 The System One service is now qualified for shadow-only use on CPU PyTorch
 2.13.0. Qualification here means the pinned runtime starts and answers, not that

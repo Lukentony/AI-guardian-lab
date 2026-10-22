@@ -79,6 +79,12 @@ def test_compose_static_security_and_build_contexts():
     assert "ports" not in services["system-one"]
     assert services["system-one"]["profiles"] == ["system-one", "full"]
     assert services["llama"]["profiles"] == ["full"]
+    assert services["executor"]["profiles"] == ["full"]
+    assert services["executor"]["read_only"] is True
+    assert services["executor"]["networks"] == ["exec-net"]
+    assert services["executor"]["deploy"]["resources"]["limits"]["pids"] == 64
+    assert "exec-net" in services["ui"]["networks"]
+    assert config["networks"]["exec-net"]["internal"] is True
     assert "${INTENT_LLM_TIMEOUT_SECONDS" in services["guardian"]["environment"][
         "INTENT_LLM_TIMEOUT_SECONDS"
     ]

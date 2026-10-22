@@ -22,6 +22,7 @@ from database.audit_logger import mask_secrets as mask_secrets
 from guardian.guardian import intent
 from guardian.guardian.auth import check_auth
 from guardian.guardian.configuration import load_learned, load_policy, read_yaml, update_learned
+from guardian.guardian.execution_token import issue as issue_execution_token
 from guardian.guardian.forensics_routes import forensics_bp
 from guardian.guardian.shell_commands import UnsupportedShellError, parse_commands
 from guardian.guardian.shell_commands import extract_binaries as extract_binaries
@@ -278,12 +279,18 @@ def validate():
     except Exception:
         logger.error("Audit append failed; authorization withheld")
         return jsonify({"approved": False, "error": "Audit unavailable"}), 503
+    token = (
+        issue_execution_token(validation_id, command, os.getenv("EXECUTOR_HMAC_KEY", ""))
+        if approved
+        else None
+    )
     return jsonify(
         {
             "approved": approved,
             "reason": reason,
             "intent_source": source,
             "validation_id": validation_id,
+            "execution_token": token,
             "system_one": observation,
         }
     ), 200

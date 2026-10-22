@@ -338,3 +338,34 @@ def test_ui_console_rejects_an_empty_command(monkeypatch):
             json={"command": "", "task": "List files"},
         )
     assert response.status_code == 400
+
+
+def test_ui_console_executes_only_through_the_executor(monkeypatch, requests_mock):
+    monkeypatch.setenv("UI_PASSWORD", "ui-test-password")
+    monkeypatch.setattr(ui, "EXECUTOR_URL", "http://executor:5002")
+    requests_mock.post(
+        "http://executor:5002/execute",
+        json={
+            "status": "executed",
+            "exit_code": 0,
+            "stdout": "ok\n",
+            "stderr": "",
+            "validation_id": "validation-1",
+        },
+    )
+    requests_mock.post(f"{ui.GUARDIAN_API}/report", json={"status": "logged"})
+    requests_mock.get(
+        f"{ui.GUARDIAN_API}/audit",
+        json={"stats": {"total": 4, "executed": 1, "rejected": 1}, "commands": []},
+    )
+    with ui.app.test_client() as client:
+        response = client.post(
+            "/console/execute",
+            headers=_auth_headers(),
+            json={"command": "printf ok", "token": "token-value"},
+        )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["stdout"] == "ok\n"
+    assert payload["outcome_recorded"] is True
+    assert payload["audit"]["executed"] == 1

@@ -164,3 +164,26 @@ def test_audit_failure_never_authorizes(client, headers, monkeypatch):
         "/validate", json={"command": "ls", "task": "list files"}, headers=headers
     )
     assert response.status_code == 503 and response.json["approved"] is False
+
+
+def test_validate_issues_a_command_bound_executor_token(
+    client, headers, monkeypatch, requests_mock
+):
+    from guardian.guardian.execution_token import verify
+
+    monkeypatch.setenv("EXECUTOR_HMAC_KEY", "ci-executor-key")
+    approved = client.post(
+        "/validate",
+        json={"command": "ls /tmp", "task": "list files"},
+        headers=headers,
+    )
+    token = approved.get_json()["execution_token"]
+    assert verify(token, "ls /tmp", "ci-executor-key")
+    assert not verify(token, "rm -rf /tmp", "ci-executor-key")
+
+    rejected = client.post(
+        "/validate",
+        json={"command": "rm -rf /", "task": "list files"},
+        headers=headers,
+    )
+    assert rejected.get_json()["execution_token"] is None

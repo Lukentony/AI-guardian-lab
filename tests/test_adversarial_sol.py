@@ -1100,7 +1100,10 @@ def test_deployment_static_is_nonroot_loopback_and_does_not_bake_secrets():
             ".env" not in line and ".key" not in line for line in lines if line.startswith("COPY ")
         )
         if name != "system-one":
-            assert all("127.0.0.1" in port for port in service["ports"])
+            if "ports" in service:
+                assert all("127.0.0.1" in port for port in service["ports"])
+            else:
+                assert name == "executor"
             assert service["healthcheck"]["test"][:2] == ["CMD", "python"]
         else:
             assert "ports" not in service

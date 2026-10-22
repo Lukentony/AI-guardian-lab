@@ -19,7 +19,7 @@ REQUIRED_KEYS = (
     "LOCAL_UID",
     "LOCAL_GID",
 )
-SECRET_KEYS = ("API_KEY", "LOG_HMAC_KEY", "TASK_API_KEY", "SYSTEM_ONE_API_KEY", "LLM_API_KEY")
+SECRET_KEYS = ("API_KEY", "LOG_HMAC_KEY", "TASK_API_KEY", "SYSTEM_ONE_API_KEY", "LLM_API_KEY", "EXECUTOR_HMAC_KEY")
 PORT_KEYS = ("GUARDIAN_PORT", "AGENT_PORT", "UI_PORT")
 PLACEHOLDERS = {
     "",
@@ -91,6 +91,8 @@ def validate_env(values: dict[str, str], profile: str = "demo") -> list[EnvIssue
         issues.append(EnvIssue("error", "SYSTEM_ONE_API_KEY", "required by the full profile"))
     if profile == "full" and values.get("LLM_API_KEY", "").strip().upper() in PLACEHOLDERS:
         issues.append(EnvIssue("error", "LLM_API_KEY", "required by the full profile"))
+    if profile == "full" and values.get("EXECUTOR_HMAC_KEY", "").strip().upper() in PLACEHOLDERS:
+        issues.append(EnvIssue("error", "EXECUTOR_HMAC_KEY", "required by the full profile"))
 
     present_secrets = [key for key in SECRET_KEYS if values.get(key)]
     for index, key in enumerate(present_secrets):
@@ -200,6 +202,8 @@ def generate_env(profile: str, uid: int, gid: int) -> dict[str, str]:
         "COMPOSE_PROFILES": "",
         "LLM_API_BASE": "http://host.docker.internal:8080/v1",
         "LLM_API_KEY": secrets.token_urlsafe(32),
+        "EXECUTOR_HMAC_KEY": secrets.token_urlsafe(32),
+        "EXECUTOR_URL": "",
         "LLM_MODEL": "qwen2.5-3b-instruct",
         "LLM_MODEL_CODER": "qwen2.5-3b-instruct",
         "INTENT_LLM_MODEL": "openai/qwen2.5-3b-instruct",
@@ -222,6 +226,7 @@ def generate_env(profile: str, uid: int, gid: int) -> dict[str, str]:
         values.update(
             {
                 "COMPOSE_PROFILES": "full",
+                "EXECUTOR_URL": "http://executor:5002",
                 "LLM_API_BASE": "http://llama:8080/v1",
                 "LLAMA_MODEL_FILE": "qwen2.5-3b-instruct-q4_k_m.gguf",
                 "LLM_MODEL": "qwen2.5-3b-instruct",

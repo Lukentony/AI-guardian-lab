@@ -616,6 +616,40 @@ def check_system_one(
     ]
 
 
+def check_executor(
+    root: Path,
+    env_file: Path,
+    compose_file: Path,
+    values: dict[str, str],
+    stack_running: bool,
+) -> list[Check]:
+    required = values.get("GUARDIAN_PROFILE") == "full"
+    if not stack_running:
+        return [Check("executor", "sandbox", False, required, "stack is not running")]
+    script = (
+        "import urllib.request;"
+        "print(urllib.request.urlopen('http://executor:5002/health',timeout=5).read().decode())"
+    )
+    code, out, err = run_compose(
+        root,
+        env_file,
+        compose_file,
+        ["exec", "-T", "ui", "python", "-c", script],
+        timeout=20,
+    )
+    ok = code == 0 and bool(out)
+    return [
+        Check(
+            "executor",
+            "sandbox",
+            ok,
+            required,
+            "reachable" if ok else (err or out or "health check failed"),
+            "Start the full profile and check: docker compose logs executor",
+        )
+    ]
+
+
 def check_compose_config(root: Path, env_file: Path, compose_file: Path) -> list[Check]:
     code, out, err = run_compose(root, env_file, compose_file, ["config", "--quiet"])
     if code == 0:
@@ -677,4 +711,5 @@ def run_doctor(
         checks.extend(check_models(root, env_file, compose_file, values, stack_running))
     if profile == "full":
         checks.extend(check_system_one(root, env_file, compose_file, values, stack_running))
+        checks.extend(check_executor(root, env_file, compose_file, values, stack_running))
     return checks
