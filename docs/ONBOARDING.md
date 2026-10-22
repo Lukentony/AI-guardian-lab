@@ -123,7 +123,9 @@ download can take several minutes. `doctor` then checks the models, the System
 One health endpoint, UI authentication, the audit API and the chain.
 `demo --full` runs deterministic allow and block cases, one semantic-review case,
 one forensics analysis and one dry-run Agent request. It also verifies that the
-observer recorded an actual observation rather than `unavailable`.
+observer recorded an actual observation rather than `unavailable`. The Agent
+check accepts `simulated` or `rejected`: both prove the Agent-to-Guardian path,
+but only `simulated` covers approval through simulation and outcome reporting.
 
 The full profile uses a 2-second observer budget. The default 500 ms budget is
 still too tight for the 0.8B CPU model, so the default demo records `unavailable`

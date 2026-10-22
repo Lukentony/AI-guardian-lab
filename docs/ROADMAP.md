@@ -10,8 +10,8 @@ measured results rather than treating this roadmap as a completion record.
   `guardian-lab demo --full`.
 - Kev on CPU torch 2.13.0, audited; the torch 2.8 quarantine is removed.
 - Observer timeout configurable up to 5 seconds; full profile uses 2 seconds.
-- Native full-stack verification: semantic review, System One observation,
-  forensics, dry-run Agent and a valid audit chain.
+- Native full-stack and Docker VM verification: semantic review, System One
+  observation, forensics, dry-run Agent and a valid audit chain.
 
 ## Completed in 1.5
 
@@ -32,8 +32,6 @@ measured results rather than treating this roadmap as a completion record.
   which targets are supported rather than experimental.
 - Verify persistent-state recovery on a long-lived host with backups.
 - Publish multi-architecture images and pin them by digest after qualification.
-- Build and verify the full profile in a Docker-capable VM, including the
-  System One image and model downloads.
 - The 0.8B observer still misses the default 500 ms budget; the full profile uses
   2 seconds. Evaluate a faster backend or hardware before claiming the default.
 - Evaluate the observer on independent workloads and hold out the test split.

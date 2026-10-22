@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
-from tools.onboarding.envfile import EnvIssue, read_env_file, validate_env
+from tools.onboarding.envfile import read_env_file, validate_env
 
 
 @dataclass(frozen=True)
@@ -553,9 +553,7 @@ def check_models(
 
     checks = [Check("models", "endpoint", True, required, f"reachable ({source} probe)")]
     for model in models:
-        found = model in names or any(
-            name.split(":", 1)[0] == model.split(":", 1)[0] for name in names
-        )
+        found = model in names
         checks.append(
             Check(
                 "models",
@@ -661,6 +659,11 @@ def check_compose_config(root: Path, env_file: Path, compose_file: Path) -> list
     ]
 
 
+def resolve_profile(values: dict[str, str], override: str | None) -> str:
+    """An explicit CLI profile wins; otherwise the profile stored in .env wins."""
+    return override or values.get("GUARDIAN_PROFILE", "demo")
+
+
 def run_doctor(
     root: Path,
     env_file: Path,
@@ -682,7 +685,8 @@ def run_doctor(
             )
         ]
 
-    profile = values.get("GUARDIAN_PROFILE", profile or "demo")
+    profile = resolve_profile(values, profile)
+    values = {**values, "GUARDIAN_PROFILE": profile}
     checks: list[Check] = []
     checks.extend(check_env(values, profile))
     checks.extend(check_docker())
@@ -700,13 +704,4 @@ def run_doctor(
         checks.extend(check_models(root, env_file, compose_file, values, stack_running))
     if profile == "full":
         checks.extend(check_system_one(root, env_file, compose_file, values, stack_running))
-    return checks
-
-
-def issue_checks(issues: Sequence[EnvIssue]) -> list[Check]:
-    """Translate configuration issues for callers that already parsed the file."""
-    checks: list[Check] = []
-    for issue in issues:
-        required = issue.level == "error"
-        checks.append(Check("config", issue.key, not required, required, issue.message))
     return checks

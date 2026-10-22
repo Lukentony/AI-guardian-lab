@@ -2,21 +2,22 @@
 
 ## 1.6.0 full-profile verification
 
-Scope: branch `feature/full-stack`, based on `7f3a2d6`. This is not a production
-approval. Model-based enforcement remains disabled and no remote deployment was
+Scope: branch `fix/release-blockers`, based on `main` at `3a60310`. This is not a
+production approval. Model-based enforcement remains disabled and no remote deployment was
 performed.
 
 | Check | Observed result |
 | --- | --- |
-| Complete offline pytest suite | **391 passed**, no skips |
+| Complete offline pytest suite | **394 passed**, no skips |
 | Application/scripts/tests/onboarding Pyright | 0 errors, 0 warnings |
 | Separate model-service Pyright project | 0 errors, 0 warnings |
 | Ruff on runtime surfaces, onboarding and tests | Passed |
 | System One runtime | Kev 0.8B on CPU torch 2.13.0, eight threads, prefix cache |
-| Calibration at the full-profile 2 s budget | 8/8 observed; p50 **1,214.625 ms**; p95 **1,289.89 ms** |
+| Latency comparison below 2 s | 8/8 observed; p50 **1,214.625 ms**; p95 **1,289.89 ms**; 10 s diagnostic timeout |
 | Calibration at the unchanged 500 ms default | 0/8 |
+| GitHub Actions CI at `3a60310` (main) | Passed |
 | Mean per-question Brier score | **0.228625120625** on the handcrafted set |
-| `pip-audit` against torch 2.13.0 and the hashed lock | No known vulnerabilities |
+| `pip-audit` against torch 2.13.0 and the pinned lock | No known vulnerabilities |
 | Native full stack: Guardian, Agent, UI, Ollama, System One | All health checks passed |
 | Three `/validate` cases | Allow, block and semantic review all matched; System One was `observed` on the two non-baseline cases |
 | Agent dry-run | `simulated`; no command executed |
@@ -26,6 +27,11 @@ performed.
 | `guardian-lab demo --full` orchestration | PASS against the native stack and PASS again in the Docker VM |
 | Full-profile Docker build and VM run | PASS in the disposable Ubuntu 24.04 VM; five services healthy, models present, demo 3/3 |
 | System One container runtime | Python 3.13.17, torch **2.13.0+cpu**, Kev health observable |
+
+The latency reports compared observed times with the configured budget while
+using a 10 s diagnostic timeout; they were not eight runs under an actual 2 s
+deadline, and eight samples do not give a robust p95. The full demo separately
+used the configured 2 s timeout.
 
 The native stack used `qwen2.5:3b` for semantic review and forensics and
 `qwen2.5-coder:3b` for the Agent, with System One on the pinned Kev checkpoint.
@@ -41,7 +47,7 @@ UI, Ollama and System One. `guardian-lab models` pulled both 3B models;
 `guardian-lab demo --full` passed 3/3 cases with a valid chain. The Agent ran in
 dry-run and the audit showed no `executed` rows.
 
-The first Docker run exposed two integration defects:
+The Docker work exposed these integration defects:
 
 1. `doctor` defaulted to the demo profile and skipped models and System One even
    when `.env` said `full`. It now reads `GUARDIAN_PROFILE` unless the flag
@@ -53,6 +59,13 @@ The first Docker run exposed two integration defects:
    the semantic case exceeded it and appeared as `Guardian is unreachable`. The
    validation request now uses a bounded 120 s timeout; Guardian itself keeps
    its own 30 s semantic timeout.
+4. `doctor` accepted a different Ollama tag as present because it compared only
+   the name before `:`. Model presence now requires the exact tag.
+5. The full profile gave the Agent only 15 s while L4 could take 30 s. The Agent
+   budget is now 45 s.
+6. The first System One inference after a cold start could exceed the 2 s request
+   deadline even after `/health` was ready. The service now warms the model before
+   reporting healthy; the startup gate requires exact torch 2.13.0 and Kev 0.1.0.
 
 All fixes were applied and the full demo was rerun successfully. The published
 1.6.0 release archive and GHCR release images were not built in this session;
@@ -299,8 +312,8 @@ repeat evaluation. The recorded local runtime is no longer permitted to start.
 | Blocker/limit | Practical next step | Owner |
 | --- | --- | --- |
 | Target-host deployment | Repeat the smoke check on the intended host, then verify backups, UID/GID ownership and recovery there | Deployment owner |
-| Full-profile Docker build and VM run | Build the System One image, start the full profile, pull the models and repeat `demo --full` in a disposable Docker host | Integration maintainer |
-| CPU latency and unreliable scores | The 2 s full-profile budget is qualified for shadow use; the 500 ms default still fails. Benchmark on independent labelled calibration and untouched held-out workloads; do not loosen thresholds merely to pass | Evaluation owner |
+| Release-candidate archive and images | Build the candidate, install it on a clean Ubuntu host with anonymous GHCR pulls, run the base and full demos, restart and verify the chain | Release owner |
+| CPU latency and unreliable scores | The full-profile request timeout was observed at a p50 of about 1.2 s; the 500 ms default still fails. This is not an SLO. Benchmark on independent labelled calibration and untouched held-out workloads; do not loosen thresholds merely to pass | Evaluation owner |
 | No production sandbox or durable exactly-once executor | Supply and verify OS-level isolation and recovery semantics before any real untrusted execution | Deployment/security owner |
 
 The GitHub workflow pins actions by commit and includes ordinary-service Compose

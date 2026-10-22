@@ -223,7 +223,7 @@ def generate_env(profile: str, uid: int, gid: int) -> dict[str, str]:
                 "INTENT_LLM_MODEL": "ollama/qwen2.5:3b",
                 "LLM_MODEL_EXPLAIN": "qwen2.5:3b",
                 "INTENT_LLM_TIMEOUT_SECONDS": "30",
-                "GUARDIAN_TIMEOUT_SECONDS": "15",
+                "GUARDIAN_TIMEOUT_SECONDS": "45",
                 "SYSTEM_ONE_TIMEOUT_SECONDS": "2.0",
             }
         )

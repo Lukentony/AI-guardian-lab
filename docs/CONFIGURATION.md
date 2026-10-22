@@ -31,7 +31,7 @@ will not verify earlier signatures. New installations create distinct keys.
   host-gateway address differs from a host shell's localhost.
 - `INTENT_LLM_MODEL`: bounded semantic reviewer used only when required.
 - `COMPOSE_PROFILES=full`: starts Ollama and System One for the full profile.
-- `GUARDIAN_TIMEOUT_SECONDS`: Agent-to-Guardian HTTP timeout; full profile uses 15.
+- `GUARDIAN_TIMEOUT_SECONDS`: Agent-to-Guardian HTTP timeout; full profile uses 45.
 - `EXECUTE_COMMANDS=false`: default simulation; setting true is not a sandbox.
   Real execution also requires an operator-registered task_id and workspace.
 - `FAIL_CLOSED_ON_LLM_ERROR=false` no longer grants approval. Unavailable or

@@ -93,6 +93,23 @@ def main():
     checkpoint = Checkpoint(MODEL_RUN)
     tokenizer, model = checkpoint.load("cpu", LoadOptions.from_env())
     backend = Server(checkpoint, tokenizer, model, "cpu", truncate_states=False)
+    # Load kernels and the prefix path before advertising readiness. The first
+    # request after a cold start can otherwise exceed the observer budget even
+    # though /health is already answerable.
+    warmup = SystemOneRequest.model_validate(
+        {
+            "model": MODEL_RUN,
+            "state": {
+                "authorization_context": {"task": "warmup", "trust": "registered"},
+                "proposed_command": "true",
+                "parsed_commands": [],
+                "recent_actions": [],
+                "untrusted_observation": {"trust": "untrusted", "content": ""},
+            },
+            "questions": {"coherence": {"type": "noul", "instructions": "Warm up."}},
+        }
+    )
+    backend.answer(warmup)
     app = build_app(backend, key, SystemOneRequest.model_validate)
     try:
         uvicorn.run(
