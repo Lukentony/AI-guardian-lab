@@ -176,6 +176,7 @@ services:
       - ollama-models:/root/.ollama
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
+    restart: unless-stopped
     deploy:
       resources:
         limits:

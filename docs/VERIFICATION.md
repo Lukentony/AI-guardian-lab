@@ -8,7 +8,7 @@ performed.
 
 | Check | Observed result |
 | --- | --- |
-| Complete offline pytest suite | **390 passed**, no skips |
+| Complete offline pytest suite | **391 passed**, no skips |
 | Application/scripts/tests/onboarding Pyright | 0 errors, 0 warnings |
 | Separate model-service Pyright project | 0 errors, 0 warnings |
 | Ruff on runtime surfaces, onboarding and tests | Passed |
@@ -49,8 +49,12 @@ The first Docker run exposed two integration defects:
 2. Compose hard-coded `INTENT_LLM_TIMEOUT_SECONDS=2`, overriding the full-profile
    value of 30. The semantic case therefore failed as `llm_error`. Compose now
    interpolates the setting.
+3. The CLI demo's validation POST used a 15 s client timeout. On the CPU-only VM
+   the semantic case exceeded it and appeared as `Guardian is unreachable`. The
+   validation request now uses a bounded 120 s timeout; Guardian itself keeps
+   its own 30 s semantic timeout.
 
-Both fixes were applied and the full demo was rerun successfully. The published
+All fixes were applied and the full demo was rerun successfully. The published
 1.6.0 release archive and GHCR release images were not built in this session;
 the source build above is the verified path.
 

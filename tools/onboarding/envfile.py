@@ -87,6 +87,9 @@ def validate_env(values: dict[str, str], profile: str = "demo") -> list[EnvIssue
     if api_key and len(api_key) < 12:
         issues.append(EnvIssue("error", "API_KEY", "shorter than 12 characters"))
 
+    if profile == "full" and values.get("SYSTEM_ONE_API_KEY", "").strip().upper() in PLACEHOLDERS:
+        issues.append(EnvIssue("error", "SYSTEM_ONE_API_KEY", "required by the full profile"))
+
     present_secrets = [key for key in SECRET_KEYS if values.get(key)]
     for index, key in enumerate(present_secrets):
         for other in present_secrets[index + 1 :]:
@@ -183,7 +186,7 @@ def generate_env(profile: str, uid: int, gid: int) -> dict[str, str]:
     if profile not in {"demo", "local-models", "full"}:
         raise EnvError(f"unknown profile {profile!r}")
 
-    return {
+    values = {
         "GUARDIAN_PROFILE": profile,
         "API_KEY": secrets.token_urlsafe(32),
         "LOG_HMAC_KEY": secrets.token_hex(32),
@@ -192,15 +195,15 @@ def generate_env(profile: str, uid: int, gid: int) -> dict[str, str]:
         "UI_USERNAME": "guardian",
         "UI_PASSWORD": secrets.token_urlsafe(24),
         "LLM_PROVIDER": "ollama",
-        "COMPOSE_PROFILES": "full" if profile == "full" else "",
-        "OLLAMA_URL": "http://ollama:11434" if profile == "full" else "http://host.docker.internal:11434",
-        "LLM_MODEL_CODER": "qwen2.5-coder:3b" if profile == "full" else "qwen2.5-coder:7b",
-        "INTENT_LLM_MODEL": "ollama/qwen2.5:3b" if profile == "full" else "ollama/deepseek-coder-v2:16b",
-        "LLM_MODEL_EXPLAIN": "qwen2.5:3b" if profile == "full" else "deepseek-coder-v2:16b",
-        "INTENT_LLM_TIMEOUT_SECONDS": "30" if profile == "full" else "2",
-        "GUARDIAN_TIMEOUT_SECONDS": "15" if profile == "full" else "5",
+        "COMPOSE_PROFILES": "",
+        "OLLAMA_URL": "http://host.docker.internal:11434",
+        "LLM_MODEL_CODER": "qwen2.5-coder:7b",
+        "INTENT_LLM_MODEL": "ollama/deepseek-coder-v2:16b",
+        "LLM_MODEL_EXPLAIN": "deepseek-coder-v2:16b",
+        "INTENT_LLM_TIMEOUT_SECONDS": "2",
+        "GUARDIAN_TIMEOUT_SECONDS": "5",
         "SYSTEM_ONE_URL": "http://system-one:8009/v1/systemone",
-        "SYSTEM_ONE_TIMEOUT_SECONDS": "2.0" if profile == "full" else "0.5",
+        "SYSTEM_ONE_TIMEOUT_SECONDS": "0.5",
         "SYSTEM_ONE_THREADS": "8",
         "GUARDIAN_BIND_IP": "127.0.0.1",
         "GUARDIAN_PORT": "5000",
@@ -211,6 +214,20 @@ def generate_env(profile: str, uid: int, gid: int) -> dict[str, str]:
         "RATE_LIMIT_STORAGE_URI": "memory://",
         "EXECUTE_COMMANDS": "false",
     }
+    if profile == "full":
+        values.update(
+            {
+                "COMPOSE_PROFILES": "full",
+                "OLLAMA_URL": "http://ollama:11434",
+                "LLM_MODEL_CODER": "qwen2.5-coder:3b",
+                "INTENT_LLM_MODEL": "ollama/qwen2.5:3b",
+                "LLM_MODEL_EXPLAIN": "qwen2.5:3b",
+                "INTENT_LLM_TIMEOUT_SECONDS": "30",
+                "GUARDIAN_TIMEOUT_SECONDS": "15",
+                "SYSTEM_ONE_TIMEOUT_SECONDS": "2.0",
+            }
+        )
+    return values
 
 
 def write_env_file(path: Path, values: dict[str, str]) -> None:
