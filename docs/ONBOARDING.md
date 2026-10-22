@@ -118,7 +118,7 @@ configured reviewer model is present. It does not send a generation request.
 ./guardian-lab demo --full
 ```
 
-`models` pulls the three configured models into the Ollama service; the first
+`models` pulls the configured 3B models into the Ollama service; the first
 download can take several minutes. `doctor` then checks the models, the System
 One health endpoint, UI authentication, the audit API and the chain.
 `demo --full` runs deterministic allow and block cases, one semantic-review case,

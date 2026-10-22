@@ -46,9 +46,7 @@ def require_qualified_runtime() -> None:
     except PackageNotFoundError as exc:
         raise RuntimeError("PyTorch is not installed for the optional service") from exc
     if not TORCH_MIN <= _release_tuple(installed_torch)[:2] < TORCH_MAX_EXCLUSIVE:
-        raise RuntimeError(
-            f"Unsupported torch {installed_torch}; {BLOCK_REASON}"
-        )
+        raise RuntimeError(f"Unsupported torch {installed_torch}; {BLOCK_REASON}")
     try:
         installed_kev = version("kev")
     except PackageNotFoundError as exc:

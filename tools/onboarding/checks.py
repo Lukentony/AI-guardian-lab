@@ -13,7 +13,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 from tools.onboarding.envfile import EnvIssue, read_env_file, validate_env
 
@@ -574,7 +574,7 @@ def pull_models(
     env_file: Path,
     compose_file: Path,
     values: dict[str, str],
-    out=print,
+    out: Callable[[str], None] = print,
 ) -> int:
     """Pull the configured local models into the full-profile Ollama service."""
     if values.get("GUARDIAN_PROFILE") != "full":
@@ -621,7 +621,7 @@ def check_system_one(
             )
         ]
     script = (
-        "import json,urllib.request;"
+        "import urllib.request;"
         "print(urllib.request.urlopen('http://system-one:8009/health',timeout=10).read().decode())"
     )
     code, out, err = run_compose(

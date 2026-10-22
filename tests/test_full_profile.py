@@ -43,11 +43,22 @@ def test_full_profile_configures_models_and_observer_budget() -> None:
     assert [issue for issue in validate_env(values, "full") if issue.level == "error"] == []
 
 
+def test_full_profile_requires_the_observer_key() -> None:
+    values = generate_env("full", 1000, 1000)
+    values["SYSTEM_ONE_API_KEY"] = ""
+    assert any(
+        issue.level == "error" and issue.key == "SYSTEM_ONE_API_KEY"
+        for issue in validate_env(values, "full")
+    )
+
+
 def test_full_profile_keeps_execution_disabled() -> None:
     values = generate_env("full", 1000, 1000)
     values["EXECUTE_COMMANDS"] = "true"
     issues = validate_env(values, "full")
-    assert any(issue.level == "warning" and "not an OS-level sandbox" in issue.message for issue in issues)
+    assert any(
+        issue.level == "warning" and "not an OS-level sandbox" in issue.message for issue in issues
+    )
     assert not any(issue.level == "error" for issue in issues)
 
 
