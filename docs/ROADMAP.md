@@ -6,7 +6,7 @@ measured results rather than treating this roadmap as a completion record.
 
 ## Completed in 1.6
 
-- Full profile with Ollama, System One, `guardian-lab models` and
+- Full profile with llama.cpp, System One, `guardian-lab models` and
   `guardian-lab demo --full`.
 - Kev on CPU torch 2.13.0, audited; the torch 2.8 quarantine is removed.
 - Observer timeout configurable up to 5 seconds; full profile uses 2 seconds.

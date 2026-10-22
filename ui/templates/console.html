@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Control room · AI Guardian Lab{% endblock %}
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Live control room</p>
+        <h1>One command, one visible decision.</h1>
+        <p class="lede">Type a task and a proposed shell command. Guardian runs the same authenticated path as the API: parser, policy, optional observer, semantic review and signed audit. Nothing is executed here.</p>
+    </div>
+    <div class="actions">
+        <a class="btn" href="/status">System status</a>
+        <a class="btn" href="/demo">Five-case demo</a>
+    </div>
+</section>
+
+<section class="console-layout">
+    <aside class="panel console-rail" aria-labelledby="scenarios-title">
+        <header class="panel-head">
+            <div>
+                <h2 id="scenarios-title">Scenes</h2>
+                <p>Start from a fixed case or write your own.</p>
+            </div>
+        </header>
+        <div class="scenario-list" id="scenario-list">
+            {% for case in scenarios %}
+            <button class="scenario-btn" type="button" data-scenario="{{ loop.index0 }}">
+                <span class="scenario-index">{{ "%02d"|format(loop.index) }}</span>
+                <span class="scenario-copy">
+                    <strong>{{ case.name }}</strong>
+                    <code>{{ case.command }}</code>
+                </span>
+            </button>
+            {% endfor %}
+        </div>
+        <form class="console-form" id="console-form">
+            <label for="console-task">Task</label>
+            <textarea id="console-task" name="task" rows="2" maxlength="4096" required>List files in the temporary directory</textarea>
+            <label for="console-command">Proposed command</label>
+            <textarea id="console-command" name="command" rows="2" maxlength="8192" required>ls /tmp</textarea>
+            <label for="console-untrusted">Untrusted tool output <span class="hint">optional</span></label>
+            <textarea id="console-untrusted" name="untrusted" rows="2" maxlength="8192"></textarea>
+            <button class="btn btn-primary" type="submit" id="console-submit">Validate command</button>
+            <p class="hint" id="console-status" role="status">Validation only. No command is executed.</p>
+        </form>
+    </aside>
+
+    <div class="console-main">
+        <section class="panel trace-panel" aria-labelledby="trace-title">
+            <header class="panel-head">
+                <div>
+                    <p class="eyebrow">Decision trace</p>
+                    <h2 id="trace-title">Pipeline</h2>
+                </div>
+                <span class="chip chip-idle" id="trace-state">Idle</span>
+            </header>
+            <div class="trace" role="list">
+                <article class="trace-step" id="step-parse" role="listitem">
+                    <span class="trace-dot"></span>
+                    <span class="trace-label">Parser</span>
+                    <span class="trace-detail">Shell syntax</span>
+                </article>
+                <article class="trace-step" id="step-policy" role="listitem">
+                    <span class="trace-dot"></span>
+                    <span class="trace-label">Policy</span>
+                    <span class="trace-detail">Allowlist, patterns, intent</span>
+                </article>
+                <article class="trace-step" id="step-observer" role="listitem">
+                    <span class="trace-dot"></span>
+                    <span class="trace-label">Observer</span>
+                    <span class="trace-detail">System One, shadow</span>
+                </article>
+                <article class="trace-step" id="step-semantic" role="listitem">
+                    <span class="trace-dot"></span>
+                    <span class="trace-label">Reviewer</span>
+                    <span class="trace-detail">Only when required</span>
+                </article>
+                <article class="trace-step" id="step-audit" role="listitem">
+                    <span class="trace-dot"></span>
+                    <span class="trace-label">Audit</span>
+                    <span class="trace-detail">HMAC chain</span>
+                </article>
+            </div>
+        </section>
+
+        <section class="panel decision-panel" aria-labelledby="decision-title">
+            <header class="panel-head">
+                <div>
+                    <p class="eyebrow">Result</p>
+                    <h2 id="decision-title">Awaiting a command</h2>
+                </div>
+                <span class="decision-badge is-idle" id="decision-badge">IDLE</span>
+            </header>
+            <p class="decision-reason" id="decision-reason">Choose a scene or validate a custom command.</p>
+            <dl class="kv">
+                <div><dt>Source</dt><dd id="decision-source">—</dd></div>
+                <div><dt>Validation ID</dt><dd id="decision-id">—</dd></div>
+                <div><dt>Execution</dt><dd id="decision-execution">Not executed</dd></div>
+                <div><dt>Sandbox</dt><dd id="decision-sandbox">Not configured in this demo</dd></div>
+            </dl>
+        </section>
+
+        <div class="console-grid">
+            <section class="panel" aria-labelledby="observer-title">
+                <header class="panel-head">
+                    <div>
+                        <h2 id="observer-title">Observer evidence</h2>
+                        <p>Shadow only. It never changes the decision.</p>
+                    </div>
+                </header>
+                <div id="observer-body" class="evidence-body">
+                    <p class="muted">No observation yet.</p>
+                </div>
+            </section>
+            <section class="panel" aria-labelledby="audit-title">
+                <header class="panel-head">
+                    <div>
+                        <h2 id="audit-title">Signed receipt</h2>
+                        <p>Read through Guardian, never from a local database.</p>
+                    </div>
+                </header>
+                <div class="receipt" id="audit-body">
+                    <span class="muted">No audit data yet.</span>
+                </div>
+            </section>
+        </div>
+    </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script id="console-scenarios" type="application/json">{{ scenarios|tojson }}</script>
+<script src="{{ url_for('static', filename='console.js') }}" defer></script>
+{% endblock %}

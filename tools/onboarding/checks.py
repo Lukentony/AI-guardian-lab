@@ -13,7 +13,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Sequence
+from typing import Any, Sequence
 
 from tools.onboarding.envfile import read_env_file, validate_env
 
@@ -169,7 +169,7 @@ def check_docker() -> list[Check]:
 
 def check_state_dirs(root: Path) -> list[Check]:
     checks: list[Check] = []
-    for relative in ("state/audit", "state/learned"):
+    for relative in ("state/audit", "state/learned", "state/models"):
         path = root / relative
         if not path.is_dir():
             checks.append(
@@ -204,7 +204,7 @@ def check_state_dirs(root: Path) -> list[Check]:
 
 
 def create_state_dirs(root: Path) -> None:
-    for relative in ("state/audit", "state/learned"):
+    for relative in ("state/audit", "state/learned", "state/models"):
         path = root / relative
         path.mkdir(parents=True, exist_ok=True)
         path.chmod(0o700)
@@ -488,18 +488,6 @@ def check_audit_chain(root: Path, values: dict[str, str]) -> list[Check]:
     ]
 
 
-def _configured_models(values: dict[str, str]) -> list[str]:
-    models: list[str] = []
-    for key in ("INTENT_LLM_MODEL", "LLM_MODEL_EXPLAIN", "LLM_MODEL_CODER"):
-        value = values.get(key, "").strip()
-        if not value:
-            continue
-        name = value.split("/", 1)[-1] if value.startswith("ollama/") else value
-        if name and name not in models:
-            models.append(name)
-    return models
-
-
 def check_models(
     root: Path,
     env_file: Path,
@@ -507,95 +495,80 @@ def check_models(
     values: dict[str, str],
     stack_running: bool,
 ) -> list[Check]:
+    from tools.onboarding.model import MODEL, model_path
+
     profile = values.get("GUARDIAN_PROFILE", "demo")
     required = profile in {"local-models", "full"}
-    models = _configured_models(values)
+    artifact = model_path(root)
+    artifact_ok = artifact.is_file() and artifact.stat().st_size == MODEL.size
+    checks = [
+        Check(
+            "models",
+            "GGUF artifact",
+            artifact_ok,
+            required,
+            f"{artifact.name} {'is present' if artifact_ok else 'is missing'}",
+            "Run guardian-lab models to download and verify the pinned GGUF.",
+        )
+    ]
+    if not stack_running:
+        return checks
 
+    script = (
+        "import json,os,urllib.request;"
+        "u=os.environ.get('LLM_API_BASE','').rstrip('/')+'/models';"
+        "r=urllib.request.Request(u,headers={'Authorization':'Bearer '+os.environ.get('LLM_API_KEY','')});"
+        "d=json.load(urllib.request.urlopen(r,timeout=5));"
+        "items=d.get('data',d.get('models',[]));"
+        "print(json.dumps([m.get('id') or m.get('name','') for m in items]))"
+    )
+    code, out, _ = run_compose(
+        root,
+        env_file,
+        compose_file,
+        ["exec", "-T", "guardian", "python", "-c", script],
+        timeout=20,
+    )
     names: list[str] | None = None
-    source = "container"
-    if stack_running:
-        script = (
-            "import json,os,urllib.request;"
-            "u=os.environ.get('OLLAMA_URL','').rstrip('/')+'/api/tags';"
-            "d=json.load(urllib.request.urlopen(u,timeout=5));"
-            "print(json.dumps([m.get('name','') for m in d.get('models',[])]))"
-        )
-        code, out, _ = run_compose(
-            root,
-            env_file,
-            compose_file,
-            ["exec", "-T", "guardian", "python", "-c", script],
-            timeout=20,
-        )
-        if code == 0 and out:
-            try:
-                names = json.loads(out.splitlines()[-1])
-            except json.JSONDecodeError:
-                names = None
+    if code == 0 and out:
+        try:
+            names = json.loads(out.splitlines()[-1])
+        except json.JSONDecodeError:
+            names = None
     if names is None:
-        source = "host"
-        url = values.get("OLLAMA_URL", "").replace("host.docker.internal", "127.0.0.1")
-        result = http_get_json(url.rstrip("/") + "/api/tags")
-        if result is not None and result[0] == 200 and isinstance(result[1], dict):
-            names = [str(item.get("name", "")) for item in result[1].get("models", [])]
-
-    if names is None:
-        return [
-            Check(
-                "models",
-                "endpoint",
-                False,
-                required,
-                "Ollama is not reachable",
-                "Start the full profile or set OLLAMA_URL; semantic checks deny ambiguous commands.",
-            )
-        ]
-
-    checks = [Check("models", "endpoint", True, required, f"reachable ({source} probe)")]
-    for model in models:
-        found = model in names
         checks.append(
             Check(
                 "models",
-                model,
-                found,
+                "llama.cpp endpoint",
+                False,
                 required,
-                f"{model} {'is present' if found else 'is missing'}",
-                "Run guardian-lab models to pull the configured local models.",
+                "endpoint is not reachable",
+                "Start the full profile and check: docker compose logs llama",
             )
         )
-    return checks
-
-
-def pull_models(
-    root: Path,
-    env_file: Path,
-    compose_file: Path,
-    values: dict[str, str],
-    out: Callable[[str], None] = print,
-) -> int:
-    """Pull the configured local models into the full-profile Ollama service."""
-    if values.get("GUARDIAN_PROFILE") != "full":
-        out("Model pull is only available for the full profile.")
-        return 2
-    models = _configured_models(values)
-    if not models:
-        out("No local models are configured.")
-        return 2
-    for model in models:
-        out(f"Pulling {model} (this can take several minutes) ...")
-        code, stdout, stderr = run_compose(
-            root,
-            env_file,
-            compose_file,
-            ["exec", "-T", "ollama", "ollama", "pull", model],
-            timeout=3600,
+        return checks
+    expected = values.get("LLM_MODEL", "qwen2.5-3b-instruct")
+    found = expected in names
+    checks.append(
+        Check(
+            "models",
+            "llama.cpp endpoint",
+            True,
+            required,
+            "reachable",
         )
-        if code != 0:
-            out(f"Could not pull {model}: {stderr or stdout or 'compose failed'}")
-            return 1
-    out("Local models are ready.")
-    return 0
+    )
+    checks.append(
+        Check(
+            "models",
+            "served model",
+            found,
+            required,
+            f"{expected} {'is served' if found else 'is not served'}",
+            "Check LLM_MODEL and the llama.cpp --alias argument.",
+        )
+    )
+    return checks
 
 
 def check_system_one(

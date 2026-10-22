@@ -60,7 +60,7 @@ def test_escalation_logic():
     report = analyze_session(session)
     assert report.escalation.triggered is False
 
-@patch("guardian.forensics.analyzer._ollama_chat")
+@patch("guardian.forensics.analyzer._openai_chat")
 def test_intent_drift_triggered(mock_chat):
     mock_chat.return_value = {
         "drifted": True,
@@ -74,7 +74,7 @@ def test_intent_drift_triggered(mock_chat):
     assert report.intent_drift.confidence == "high"
     assert "intent drift" in report.summary.lower()
 
-@patch("guardian.forensics.analyzer._ollama_chat")
+@patch("guardian.forensics.analyzer._openai_chat")
 def test_injection_triggered(mock_chat):
     # Setup mock to return True for injection, False for drift to isolate tests
     def side_effect(config, system, user):
@@ -110,7 +110,7 @@ def test_forensics_model_falls_back_to_the_installer_setting(monkeypatch):
     assert AnalyzerConfig().llm_model == "legacy:2b"
 
 
-@patch("guardian.forensics.analyzer._ollama_chat")
+@patch("guardian.forensics.analyzer._openai_chat")
 def test_llm_failure_handling(mock_chat):
     mock_chat.return_value = None # Simulate failure
     session = create_mock_session([1])
@@ -120,7 +120,7 @@ def test_llm_failure_handling(mock_chat):
     assert report.intent_drift.confidence == "low"
     assert "failed" in report.intent_drift.reason
 
-@patch("guardian.forensics.analyzer._ollama_chat")
+@patch("guardian.forensics.analyzer._openai_chat")
 def test_llm_failure_marks_analysis_incomplete(mock_chat):
     mock_chat.return_value = None
     session = create_mock_session([1], initial_task="List files")

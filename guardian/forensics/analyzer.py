@@ -29,20 +29,21 @@ class BehaviorReport:
 @dataclass
 class AnalyzerConfig:
     llm_base_url: str = field(
-        default_factory=lambda: os.environ.get("OLLAMA_URL", "http://host.docker.internal:11434")
+        default_factory=lambda: os.environ.get("LLM_API_BASE", "http://llama:8080/v1")
     )
+    llm_api_key: str = field(default_factory=lambda: os.environ.get("LLM_API_KEY", ""))
     llm_model: str = field(
         default_factory=lambda: os.environ.get(
             "FORENSICS_LLM_MODEL",
-            os.environ.get("LLM_MODEL_EXPLAIN", "deepseek-coder-v2:16b"),
+            os.environ.get("LLM_MODEL_EXPLAIN", "qwen2.5-3b-instruct"),
         )
     )
     llm_timeout: int = 30
 
 
-def _ollama_chat(config: AnalyzerConfig, system_prompt: str, user_prompt: str) -> dict | None:
-    """Helper to call Ollama /api/chat directly via urllib."""
-    url = f"{config.llm_base_url}/api/chat"
+def _openai_chat(config: AnalyzerConfig, system_prompt: str, user_prompt: str) -> dict | None:
+    """Call an OpenAI-compatible /chat/completions endpoint directly."""
+    url = f"{config.llm_base_url.rstrip('/')}/chat/completions"
     payload = {
         "model": config.llm_model,
         "messages": [
@@ -50,19 +51,23 @@ def _ollama_chat(config: AnalyzerConfig, system_prompt: str, user_prompt: str) -
             {"role": "user", "content": user_prompt},
         ],
         "stream": False,
-        "format": "json",
+        "temperature": 0,
+        "response_format": {"type": "json_object"},
     }
+    headers = {"Content-Type": "application/json"}
+    if config.llm_api_key:
+        headers["Authorization"] = f"Bearer {config.llm_api_key}"
 
     try:
         req = urllib.request.Request(
             url,
             data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
+            headers=headers,
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=config.llm_timeout) as response:
             res_data = json.loads(response.read().decode("utf-8"))
-            content = res_data.get("message", {}).get("content", "")
+            content = res_data.get("choices", [{}])[0].get("message", {}).get("content", "")
             try:
                 return json.loads(content)
             except json.JSONDecodeError:
@@ -126,7 +131,7 @@ def analyze_intent_drift(session: AnnotatedSession, config: AnalyzerConfig) -> A
         user_prompt += f"{i}. {action}\n"
     user_prompt += '\nDoes the sequence of actions match the stated task?\nRespond with exactly this JSON:\n{"drifted": true|false, "confidence": "high"|"medium"|"low", "reason": "one sentence"}'
 
-    result = _ollama_chat(config, system_prompt, user_prompt)
+    result = _openai_chat(config, system_prompt, user_prompt)
     if result is None:
         return AnalysisFlag(triggered=False, confidence="low", reason="LLM analysis failed", evaluated=False)
 
@@ -166,7 +171,7 @@ def analyze_injection_signals(session: AnnotatedSession, config: AnalyzerConfig)
 
     user_prompt += 'Respond with exactly this JSON:\n{"injection_detected": true|false, "confidence": "high"|"medium"|"low", "reason": "one sentence"}'
 
-    result = _ollama_chat(config, system_prompt, user_prompt)
+    result = _openai_chat(config, system_prompt, user_prompt)
     if result is None:
         return AnalysisFlag(triggered=False, confidence="low", reason="LLM analysis failed", evaluated=False)
 

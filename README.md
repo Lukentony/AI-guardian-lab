@@ -34,6 +34,12 @@ matrix and troubleshooting.
 
 ## Interface
 
+![Control room](docs/screenshots/console.png)
+
+The control room shows one live decision: parser, policy, shadow observer,
+semantic reviewer (when needed), signed receipt and the evidence behind the
+result. Nothing is executed; the sandbox panel is explicit about that.
+
 ![Dashboard](docs/screenshots/dashboard.png)
 
 The dashboard after the deterministic demo: signed decisions, source badges and the
@@ -59,9 +65,10 @@ paths and the experimental observer:
 ```
 
 The full demo runs deterministic allow and block cases, a semantic-review case,
-one forensics analysis and one dry-run Agent request. It starts Ollama and the
+one forensics analysis and one dry-run Agent request. It starts llama.cpp and the
 System One service; commands are still never executed. The profile is slower and
-uses small local models for a laptop-class installation.
+uses a pinned 3B GGUF for a laptop-class installation. It is local-only; a
+remote OpenAI-compatible endpoint is not a supported demo profile.
 
 The System One service is now qualified for shadow-only use on CPU PyTorch
 2.13.0. Qualification here means the pinned runtime starts and answers, not that
@@ -166,8 +173,8 @@ gate criteria.
 
 `guardian-lab` is the supported first-run path. Use [Onboarding](docs/ONBOARDING.md)
 for the release archive, the demo and diagnostics. The older interactive
-`install.sh` remains available for choosing a provider and a model; both paths
-create a private `.env`.
+`install.sh` is legacy and is not the supported llama.cpp path; use
+`guardian-lab` for the full profile. Both paths create a private `.env`.
 
 Default host ports are loopback-only: Guardian 5000, Agent 5001 and UI 8081.
 The UI requires Basic authentication and reads audit data through Guardian,

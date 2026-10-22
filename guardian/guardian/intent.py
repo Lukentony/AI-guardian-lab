@@ -263,7 +263,7 @@ def check_intent_llm(command: str, task: str) -> dict:
         if not math.isfinite(timeout) or not 0 < timeout <= 60:
             raise ValueError("Invalid semantic timeout")
         response = completion(
-            model=os.getenv("INTENT_LLM_MODEL") or "ollama/deepseek-coder-v2:16b",
+            model=os.getenv("INTENT_LLM_MODEL") or "openai/qwen2.5-3b-instruct",
             messages=[
                 {
                     "role": "system",
@@ -271,7 +271,8 @@ def check_intent_llm(command: str, task: str) -> dict:
                 },
                 {"role": "user", "content": json.dumps({"task": task, "command": command})},
             ],
-            api_base=os.getenv("OLLAMA_URL", "http://localhost:11434"),
+            api_base=os.getenv("LLM_API_BASE", "http://llama:8080/v1"),
+            api_key=os.getenv("LLM_API_KEY") or None,
             response_format={"type": "json_object"},
             temperature=0.0,
             timeout=timeout,

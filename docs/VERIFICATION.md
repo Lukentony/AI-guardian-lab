@@ -2,13 +2,13 @@
 
 ## 1.6.0 full-profile verification
 
-Scope: `main` at `d4e28ef`, with the release-blocker fixes merged. This is not
+Scope: branch `feat/llamacpp-console`, based on `main` at `d4e28ef`. This is not
 a production approval. Model-based enforcement remains disabled and no remote deployment was
 performed.
 
 | Check | Observed result |
 | --- | --- |
-| Complete offline pytest suite | **394 passed**, no skips |
+| Complete offline pytest suite | **397 passed**, no skips |
 | Application/scripts/tests/onboarding Pyright | 0 errors, 0 warnings |
 | Separate model-service Pyright project | 0 errors, 0 warnings |
 | Ruff on runtime surfaces, onboarding and tests | Passed |
@@ -19,34 +19,36 @@ performed.
 | GitHub Actions CI at `d4e28ef` (merged fixes) | Passed |
 | Mean per-question Brier score | **0.228625120625** on the handcrafted set |
 | `pip-audit` against torch 2.13.0 and the pinned lock | No known vulnerabilities |
-| Native full stack: Guardian, Agent, UI, Ollama, System One | All health checks passed |
-| Three `/validate` cases | Allow, block and semantic review all matched; System One was `observed` on the two non-baseline cases |
+| Native full stack: Guardian, Agent, UI, llama.cpp, System One | All health checks passed |
+| Three `/validate` cases | Allow and block matched; the semantic-review path returned a recorded decision; System One was `observed` on the two non-baseline cases |
 | Agent dry-run | `simulated`; no command executed |
 | Forensics | `analysis_complete=true` with the local model |
-| Audit after the three cases | +3 decisions; chain verifier reported 15 signed rows and no errors |
+| Audit after the three cases | +3 decisions; chain verifier reported a valid chain with no errors |
 | UI authentication | 401 without credentials, 200 with credentials |
 | `guardian-lab demo --full` orchestration | PASS against the native stack and PASS again in the Docker VM |
-| Full-profile Docker build and VM run | PASS in the disposable Ubuntu 24.04 VM; five services healthy, models present, demo 3/3 |
+| Full-profile Docker build and VM run | PASS in the disposable Ubuntu 24.04 VM; five services healthy, GGUF present, llama.cpp serving, demo 3/3 |
 | System One container runtime | Python 3.13.17, torch **2.13.0+cpu**, Kev health observable |
+| Control room page | Rendered at 1440 and 390; live validation and observer evidence visible |
 
 The latency reports compared observed times with the configured budget while
 using a 10 s diagnostic timeout; they were not eight runs under an actual 2 s
 deadline, and eight samples do not give a robust p95. The full demo separately
 used the configured 2 s timeout.
 
-The native stack used `qwen2.5:3b` for semantic review and forensics and
-`qwen2.5-coder:3b` for the Agent, with System One on the pinned Kev checkpoint.
-The full demo's `check_models` and `check_system_one` functions were replaced by
-successful checks for that native run; the underlying HTTP services and model
-calls were exercised directly.
+The native stack used the pinned `qwen2.5-3b-instruct-q4_k_m.gguf` through
+llama.cpp for semantic review, forensics and Agent generation, with System One on
+the pinned Kev checkpoint. The full demo's `check_models` and `check_system_one`
+functions were replaced by successful checks for that native run; the underlying
+HTTP services and model calls were exercised directly.
 
 The same source tree was then copied to the disposable Ubuntu 24.04 VM. Docker
 29.1.3 and Compose 2.40.3 built the System One image (torch 2.13.0+cpu, Kev
-pinned), pulled `ollama/ollama:0.40.8`, and reached healthy for Guardian, Agent,
-UI, Ollama and System One. `guardian-lab models` pulled both 3B models;
-`guardian-lab doctor` reported every check ok, including the observer endpoint;
-`guardian-lab demo --full` passed 3/3 cases with a valid chain. The Agent ran in
-dry-run and the audit showed no `executed` rows.
+pinned), pulled `ghcr.io/ggml-org/llama.cpp:server`, and reached healthy for
+Guardian, Agent, UI, llama.cpp and System One. `guardian-lab models` downloaded
+and verified the GGUF; `guardian-lab doctor` reported every check ok, including
+the GGUF, llama.cpp endpoint and served alias; `guardian-lab demo --full` passed
+3/3 cases with a valid chain. The Agent ran in dry-run and the audit showed no
+`executed` rows.
 
 The Docker work exposed these integration defects:
 
@@ -60,13 +62,17 @@ The Docker work exposed these integration defects:
    the semantic case exceeded it and appeared as `Guardian is unreachable`. The
    validation request now uses a bounded 120 s timeout; Guardian itself keeps
    its own 30 s semantic timeout.
-4. `doctor` accepted a different Ollama tag as present because it compared only
-   the name before `:`. Model presence now requires the exact tag.
+4. Model presence was inferred from a name prefix, so a different model could
+   satisfy the check. The full profile now verifies the pinned GGUF size and the
+   exact llama.cpp alias.
 5. The full profile gave the Agent only 15 s while L4 could take 30 s. The Agent
    budget is now 45 s.
 6. The first System One inference after a cold start could exceed the 2 s request
    deadline even after `/health` was ready. The service now warms the model before
    reporting healthy; the startup gate requires exact torch 2.13.0 and Kev 0.1.0.
+7. A model directory created with mode 700 was unreadable to the cap-dropped
+   llama.cpp container. The downloader now sets the model file to 644 and its
+   directory to 755; the Compose run was recreated and became healthy.
 
 All fixes were applied and the full demo was rerun successfully. The published
 1.6.0 release archive and GHCR release images were not built in this session;

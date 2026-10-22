@@ -9,7 +9,7 @@ import pytest
 
 from tools.onboarding import checks as checks_module
 from tools.onboarding import demo as demo_module
-from tools.onboarding.checks import Check, _configured_models, run_doctor
+from tools.onboarding.checks import Check, run_doctor
 from tools.onboarding.cli import build_parser
 from tools.onboarding.demo import FULL_CASES, run_full_demo
 from tools.onboarding.envfile import generate_env, validate_env
@@ -38,7 +38,8 @@ def test_full_profile_configures_models_and_observer_budget() -> None:
 
     assert values["GUARDIAN_PROFILE"] == "full"
     assert values["COMPOSE_PROFILES"] == "full"
-    assert values["OLLAMA_URL"] == "http://ollama:11434"
+    assert values["LLM_API_BASE"] == "http://llama:8080/v1"
+    assert values["LLAMA_MODEL_FILE"] == "qwen2.5-3b-instruct-q4_k_m.gguf"
     assert values["SYSTEM_ONE_TIMEOUT_SECONDS"] == "2.0"
     assert values["INTENT_LLM_TIMEOUT_SECONDS"] == "30"
     assert values["GUARDIAN_TIMEOUT_SECONDS"] == "45"
@@ -135,25 +136,6 @@ def test_run_doctor_honours_the_cli_profile_over_env(tmp_path, monkeypatch) -> N
     assert calls == []
 
 
-def test_check_models_requires_the_exact_tag(tmp_path, monkeypatch) -> None:
-    values = generate_env("full", 1000, 1000)
-    monkeypatch.setattr(
-        checks_module,
-        "run_compose",
-        lambda *args, **kwargs: (0, '["qwen2.5:7b", "qwen2.5-coder:3b"]', ""),
-    )
-
-    result = checks_module.check_models(
-        tmp_path,
-        tmp_path / ".env",
-        tmp_path / "docker-compose.yml",
-        values,
-        True,
-    )
-
-    assert any(item.name == "qwen2.5:3b" and not item.ok for item in result)
-
-
 def test_agent_check_accepts_only_completed_paths(monkeypatch) -> None:
     values = {"AGENT_PORT": "5001", "API_KEY": "test-key"}
     cases = [
@@ -171,13 +153,31 @@ def test_agent_check_accepts_only_completed_paths(monkeypatch) -> None:
         assert demo_module._agent_check(values, lambda _: None) is expected
 
 
-def test_configured_models_are_deduplicated() -> None:
-    values = {
-        "INTENT_LLM_MODEL": "ollama/qwen2.5:3b",
-        "LLM_MODEL_EXPLAIN": "qwen2.5:3b",
-        "LLM_MODEL_CODER": "qwen2.5-coder:3b",
-    }
-    assert _configured_models(values) == ["qwen2.5:3b", "qwen2.5-coder:3b"]
+def test_model_artifact_is_required_for_the_full_profile(tmp_path) -> None:
+    from tools.onboarding.model import MODEL, model_path
+
+    values = generate_env("full", 1000, 1000)
+    missing = checks_module.check_models(
+        tmp_path,
+        tmp_path / ".env",
+        tmp_path / "docker-compose.yml",
+        values,
+        False,
+    )
+    assert any(item.name == "GGUF artifact" and not item.ok for item in missing)
+
+    path = model_path(tmp_path)
+    path.parent.mkdir(parents=True)
+    with path.open("wb") as stream:
+        stream.truncate(MODEL.size)
+    present = checks_module.check_models(
+        tmp_path,
+        tmp_path / ".env",
+        tmp_path / "docker-compose.yml",
+        values,
+        False,
+    )
+    assert any(item.name == "GGUF artifact" and item.ok for item in present)
 
 
 def test_qualification_requires_the_exact_reviewed_runtime(monkeypatch) -> None:

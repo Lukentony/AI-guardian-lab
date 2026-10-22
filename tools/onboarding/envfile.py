@@ -19,7 +19,7 @@ REQUIRED_KEYS = (
     "LOCAL_UID",
     "LOCAL_GID",
 )
-SECRET_KEYS = ("API_KEY", "LOG_HMAC_KEY", "TASK_API_KEY", "SYSTEM_ONE_API_KEY")
+SECRET_KEYS = ("API_KEY", "LOG_HMAC_KEY", "TASK_API_KEY", "SYSTEM_ONE_API_KEY", "LLM_API_KEY")
 PORT_KEYS = ("GUARDIAN_PORT", "AGENT_PORT", "UI_PORT")
 PLACEHOLDERS = {
     "",
@@ -89,6 +89,8 @@ def validate_env(values: dict[str, str], profile: str = "demo") -> list[EnvIssue
 
     if profile == "full" and values.get("SYSTEM_ONE_API_KEY", "").strip().upper() in PLACEHOLDERS:
         issues.append(EnvIssue("error", "SYSTEM_ONE_API_KEY", "required by the full profile"))
+    if profile == "full" and values.get("LLM_API_KEY", "").strip().upper() in PLACEHOLDERS:
+        issues.append(EnvIssue("error", "LLM_API_KEY", "required by the full profile"))
 
     present_secrets = [key for key in SECRET_KEYS if values.get(key)]
     for index, key in enumerate(present_secrets):
@@ -194,12 +196,14 @@ def generate_env(profile: str, uid: int, gid: int) -> dict[str, str]:
         "SYSTEM_ONE_API_KEY": secrets.token_urlsafe(32),
         "UI_USERNAME": "guardian",
         "UI_PASSWORD": secrets.token_urlsafe(24),
-        "LLM_PROVIDER": "ollama",
+        "LLM_PROVIDER": "llama.cpp",
         "COMPOSE_PROFILES": "",
-        "OLLAMA_URL": "http://host.docker.internal:11434",
-        "LLM_MODEL_CODER": "qwen2.5-coder:7b",
-        "INTENT_LLM_MODEL": "ollama/deepseek-coder-v2:16b",
-        "LLM_MODEL_EXPLAIN": "deepseek-coder-v2:16b",
+        "LLM_API_BASE": "http://host.docker.internal:8080/v1",
+        "LLM_API_KEY": secrets.token_urlsafe(32),
+        "LLM_MODEL": "qwen2.5-3b-instruct",
+        "LLM_MODEL_CODER": "qwen2.5-3b-instruct",
+        "INTENT_LLM_MODEL": "openai/qwen2.5-3b-instruct",
+        "LLM_MODEL_EXPLAIN": "qwen2.5-3b-instruct",
         "INTENT_LLM_TIMEOUT_SECONDS": "2",
         "GUARDIAN_TIMEOUT_SECONDS": "5",
         "SYSTEM_ONE_URL": "http://system-one:8009/v1/systemone",
@@ -218,10 +222,12 @@ def generate_env(profile: str, uid: int, gid: int) -> dict[str, str]:
         values.update(
             {
                 "COMPOSE_PROFILES": "full",
-                "OLLAMA_URL": "http://ollama:11434",
-                "LLM_MODEL_CODER": "qwen2.5-coder:3b",
-                "INTENT_LLM_MODEL": "ollama/qwen2.5:3b",
-                "LLM_MODEL_EXPLAIN": "qwen2.5:3b",
+                "LLM_API_BASE": "http://llama:8080/v1",
+                "LLAMA_MODEL_FILE": "qwen2.5-3b-instruct-q4_k_m.gguf",
+                "LLM_MODEL": "qwen2.5-3b-instruct",
+                "LLM_MODEL_CODER": "qwen2.5-3b-instruct",
+                "INTENT_LLM_MODEL": "openai/qwen2.5-3b-instruct",
+                "LLM_MODEL_EXPLAIN": "qwen2.5-3b-instruct",
                 "INTENT_LLM_TIMEOUT_SECONDS": "30",
                 "GUARDIAN_TIMEOUT_SECONDS": "45",
                 "SYSTEM_ONE_TIMEOUT_SECONDS": "2.0",

@@ -118,15 +118,15 @@ audit and a new evaluation.
 ./guardian-lab demo --full
 ```
 
-The full profile starts Guardian, Agent, UI, Ollama and System One. `models`
-pulls the configured local models. `demo --full` runs deterministic allow and
+The full profile starts Guardian, Agent, UI, llama.cpp and System One.
+`models` downloads and verifies the pinned GGUF. `demo --full` runs deterministic allow and
 block cases, one semantic-review case, one forensics analysis and one dry-run
 Agent request. Nothing is executed. The default ports remain loopback-only.
 
-The full profile uses `qwen2.5:3b` for L4 and forensics, and
-`qwen2.5-coder:3b` for the Agent. These are demonstration models chosen for a
-CPU/laptop installation, not a quality benchmark. A larger local model can be
-configured, but it must fit the host and the semantic timeout.
+The full profile uses one pinned `qwen2.5-3b-instruct` GGUF for L4, forensics and
+Agent generation. It is a demonstration model chosen for a CPU/laptop
+installation, not a quality benchmark. A larger GGUF can be configured, but it
+must fit the host and the semantic timeout.
 
 ## Evaluation workflow
 

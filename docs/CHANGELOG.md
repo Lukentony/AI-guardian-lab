@@ -9,10 +9,14 @@ uses L3 for deterministic intent mapping and L4 for semantic review. See
 
 Adds a full local profile and qualifies the shadow observer.
 
-- Added `setup --profile full`, an Ollama service, System One and
+- Added `setup --profile full`, a llama.cpp service, System One and
   `guardian-lab models`.
 - Added `guardian-lab demo --full`: deterministic allow/block, semantic review,
   forensics and a dry-run Agent request in one non-executing run.
+- Added the Control room page with a live decision trace, observer evidence and
+  signed receipt.
+- Replaced the Ollama dependency with a digest-pinned llama.cpp service and one
+  verified GGUF.
 - Replaced the quarantined torch 2.8 runtime with CPU torch 2.13.0 and the pinned
   Kev archive. The startup gate now verifies the reviewed runtime.
 - Added a configurable observer timeout: 0.5 s default, 2 s full profile. The

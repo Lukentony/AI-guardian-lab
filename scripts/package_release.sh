@@ -23,7 +23,7 @@ stage="$output/ai-guardian-lab-$version"
 archive="$output/ai-guardian-lab-$version.tar.gz"
 mkdir -p "$output"
 rm -rf "$stage" "$archive" "$archive.sha256"
-mkdir -p "$stage/state/audit" "$stage/state/learned"
+mkdir -p "$stage/state/audit" "$stage/state/learned" "$stage/state/models"
 
 cp "$root/docker-compose.release.yml" "$stage/docker-compose.yml"
 sed -i -E "s/IMAGE_TAG:-[0-9]+\.[0-9]+\.[0-9]+/IMAGE_TAG:-$version/g" "$stage/docker-compose.yml"

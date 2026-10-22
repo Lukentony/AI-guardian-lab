@@ -21,11 +21,12 @@ Use the relevant service name when inspecting logs, for example
 `LOCAL_UID` and `LOCAL_GID`. Do not use chmod 777 or rerun the installer over an
 existing `.env`; follow [Install](INSTALL.md) for upgrades.
 
-### Ollama or semantic review fails
+### llama.cpp or semantic review fails
 
-Check the models on the machine that actually runs Ollama. `LLM_MODEL_CODER` and
-`INTENT_LLM_MODEL` can name different models, and both must be available when used.
-The Compose host-gateway address is not the same as localhost inside a container.
+Run `docker compose logs --tail=100 llama` and `./guardian-lab doctor`. Check that
+`state/models` is readable by the container and contains the pinned GGUF, that
+`LLM_API_BASE` points to `http://llama:8080/v1`, and that the served alias matches
+`LLM_MODEL`. `./guardian-lab models` re-downloads and verifies the artifact.
 
 An unavailable or malformed required semantic response denies validation. Do not
 turn off failure handling to get an approval. Use the
@@ -65,11 +66,12 @@ Verifica che il proprietario delle directory di stato corrisponda a `LOCAL_UID`
 e `LOCAL_GID`. Non usare chmod 777 e non rilanciare l'installer su una `.env`
 esistente. La procedura di aggiornamento è in [Install](INSTALL.md).
 
-### Ollama o la verifica semantica non rispondono
+### llama.cpp o la verifica semantica non rispondono
 
-Controlla i modelli sul computer dove gira Ollama. `LLM_MODEL_CODER` e
-`INTENT_LLM_MODEL` possono indicare modelli diversi. L'indirizzo host-gateway di
-Compose non coincide con localhost dentro il container.
+Esegui `docker compose logs --tail=100 llama` e `./guardian-lab doctor`. Controlla
+che `state/models` sia leggibile dal container e contenga il GGUF bloccato, che
+`LLM_API_BASE` punti a `http://llama:8080/v1` e che l'alias servito corrisponda a
+`LLM_MODEL`. `./guardian-lab models` riscarica e verifica l'artefatto.
 
 Se una verifica semantica necessaria fallisce, il comando viene rifiutato. Non
 disattivare questo controllo per ottenere un'approvazione. Usa

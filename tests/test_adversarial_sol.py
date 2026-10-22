@@ -973,7 +973,7 @@ def test_forensic_injection_signal_survives_real_parse_annotate_report(monkeypat
             }
         return {"drifted": False, "confidence": "high", "reason": "Matches task"}
 
-    monkeypatch.setattr(analyzer, "_ollama_chat", model)
+    monkeypatch.setattr(analyzer, "_openai_chat", model)
     session = annotator.annotate_session(
         parser.parse_session("\n".join(map(json.dumps, records)), is_file=False)
     )
