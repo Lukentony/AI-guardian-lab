@@ -34,7 +34,10 @@ will not verify earlier signatures. New installations create distinct keys.
   `FORENSICS_LLM_MODEL`.
 - `INTENT_LLM_MODEL`: LiteLLM selector for the bounded reviewer, default
   `openai/qwen2.5-3b-instruct`.
-- `COMPOSE_PROFILES=full`: starts llama.cpp and System One for the full profile.
+- `COMPOSE_PROFILES=full`: starts llama.cpp, System One and the executor.
+- `EXECUTOR_URL`: UI-to-executor endpoint in the full profile.
+- `EXECUTOR_HMAC_KEY`: shared HMAC key for short-lived, command-bound execution
+  tokens. Keep it out of the browser.
 - `GUARDIAN_TIMEOUT_SECONDS`: Agent-to-Guardian HTTP timeout; full profile uses 45.
 - `EXECUTE_COMMANDS=false`: default simulation; setting true is not a sandbox.
   Real execution also requires an operator-registered task_id and workspace.

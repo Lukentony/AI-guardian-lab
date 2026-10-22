@@ -10,6 +10,7 @@
       "enum": ["input", "shell", "allowlist", "regex", "regex_error", "mapping", "llm", "llm_error", "system_load"]
     },
     "validation_id": {"type": "string", "format": "uuid"},
+    "execution_token": {"type": ["string", "null"]},
     "system_one": {
       "type": "object",
       "required": ["mode", "status", "decision_unchanged"],

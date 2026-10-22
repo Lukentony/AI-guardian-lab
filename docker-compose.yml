@@ -24,6 +24,7 @@ services:
       SYSTEM_ONE_URL: ${SYSTEM_ONE_URL:-http://system-one:8009/v1/systemone}
       SYSTEM_ONE_API_KEY: ${SYSTEM_ONE_API_KEY:-}
       SYSTEM_ONE_TIMEOUT_SECONDS: ${SYSTEM_ONE_TIMEOUT_SECONDS:-0.5}
+      EXECUTOR_HMAC_KEY: ${EXECUTOR_HMAC_KEY:-}
       RATE_LIMIT_STORAGE_URI: ${RATE_LIMIT_STORAGE_URI:-memory://}
     volumes:
       - ./guardian/config:/app/guardian/config:ro
@@ -103,11 +104,12 @@ services:
     user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
     ports:
       - "127.0.0.1:${UI_PORT:-8081}:8080"
-    networks: [agent-net]
+    networks: [agent-net, exec-net]
     environment:
       GUARDIAN_URL: http://guardian:5000
       GUARDIAN_API_KEY: ${API_KEY:?Set API_KEY in .env}
       AGENT_URL: http://agent:5001
+      EXECUTOR_URL: ${EXECUTOR_URL:-}
       APP_VERSION: ${IMAGE_TAG:-1.6.0}
       UI_USERNAME: ${UI_USERNAME:-guardian}
       UI_PASSWORD: ${UI_PASSWORD:?Set UI_PASSWORD in .env}
@@ -169,6 +171,39 @@ services:
       timeout: 10s
       retries: 20
       start_period: 300s
+  executor:
+    profiles: [full]
+    build:
+      context: .
+      dockerfile: executor/Dockerfile
+    networks: [exec-net]
+    environment:
+      EXECUTOR_HMAC_KEY: ${EXECUTOR_HMAC_KEY:-}
+    read_only: true
+    tmpfs:
+      - "/workspace:rw,size=16m,uid=1000,gid=1000,mode=0700"
+      - "/tmp:rw,size=16m,uid=1000,gid=1000,mode=0700"
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 128M
+          pids: 64
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://localhost:5002/health', timeout=3)
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   llama:
     profiles: [full]
     image: ghcr.io/ggml-org/llama.cpp:server@sha256:8c74db29f1a2bef3f0a331b52c4d6214601dfceed4bee0b94cc48b3b23ff257d
@@ -209,5 +244,8 @@ services:
 networks:
   agent-net:
     driver: bridge
+  exec-net:
+    driver: bridge
+    internal: true
 volumes:
   system-one-models:

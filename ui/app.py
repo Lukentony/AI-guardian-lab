@@ -19,6 +19,7 @@ app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024
 GUARDIAN_API = os.environ.get("GUARDIAN_URL", "http://guardian:5000")
 GUARDIAN_API_KEY = os.environ.get("GUARDIAN_API_KEY", "")
 AGENT_URL = os.environ.get("AGENT_URL", "http://agent:5001")
+EXECUTOR_URL = os.environ.get("EXECUTOR_URL", "")
 APP_VERSION = os.environ.get("APP_VERSION", "1.6.0")
 
 DEMO_CASES = (
@@ -83,6 +84,12 @@ CONSOLE_SCENARIOS = (
         "name": "Undeclared write",
         "task": "Read the project notes",
         "command": "cat README.md > /tmp/readme-copy",
+        "untrusted": "",
+    },
+    {
+        "name": "Sandbox marker",
+        "task": "Print a marker to prove sandbox execution",
+        "command": "echo sandbox-ok",
         "untrusted": "",
     },
     {
@@ -470,8 +477,67 @@ def console_run():
         {
             "decision": decision,
             "audit": audit["stats"] if audit else None,
+            "executor": bool(EXECUTOR_URL),
         }
     )
+
+
+@app.route("/console/execute", methods=["POST"])
+def console_execute():
+    if not EXECUTOR_URL:
+        return jsonify({"error": "Sandbox executor is not configured."}), 503
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "JSON object required"}), 400
+    command = data.get("command")
+    token = data.get("token")
+    if not isinstance(command, str) or not command or len(command) > 8192:
+        return jsonify({"error": "Invalid command"}), 400
+    if not isinstance(token, str) or not token or len(token) > 4096:
+        return jsonify({"error": "Invalid authorization"}), 400
+    try:
+        with requests.Session() as session:
+            session.trust_env = False
+            response = session.post(
+                f"{EXECUTOR_URL.rstrip('/')}/execute",
+                json={"command": command, "token": token},
+                timeout=15,
+                allow_redirects=False,
+            )
+    except requests.RequestException:
+        return jsonify({"error": "Sandbox executor is unavailable."}), 502
+    try:
+        payload = response.json()
+    except ValueError:
+        return jsonify({"error": "Sandbox executor returned an invalid response."}), 502
+    if response.status_code != 200 or not isinstance(payload, dict):
+        return jsonify({"error": "Sandbox executor denied the request."}), 502
+    validation_id = payload.get("validation_id")
+    if not isinstance(validation_id, str) or not validation_id:
+        return jsonify({"error": "Sandbox response has no validation identity."}), 502
+    terminal = "executed" if payload.get("status") == "executed" else "execution_error"
+    payload["status"] = terminal
+    recorded = False
+    try:
+        report = guardian_request(
+            "POST",
+            "/report",
+            json={
+                "validation_id": validation_id,
+                "command": command,
+                "status": terminal,
+            },
+            timeout=5,
+        )
+        recorded = report.status_code == 200
+    except requests.RequestException:
+        recorded = False
+    payload["outcome_recorded"] = recorded
+    if not recorded:
+        payload["warning"] = "Execution happened but the outcome was not recorded; inspect the audit."
+    audit, _ = load_audit()
+    payload["audit"] = audit["stats"] if audit else None
+    return jsonify(payload), 200
 
 
 @app.route("/forensics", methods=["GET", "POST"])

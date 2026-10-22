@@ -2,13 +2,13 @@
 
 ## 1.6.0 full-profile verification
 
-Scope: branch `feat/llamacpp-console`, based on `main` at `d4e28ef`. This is not
+Scope: branch `feat/sandbox-executor`, based on `main` at `7c60917`. This is not
 a production approval. Model-based enforcement remains disabled and no remote deployment was
 performed.
 
 | Check | Observed result |
 | --- | --- |
-| Complete offline pytest suite | **397 passed**, no skips |
+| Complete offline pytest suite | **401 passed**, no skips |
 | Application/scripts/tests/onboarding Pyright | 0 errors, 0 warnings |
 | Separate model-service Pyright project | 0 errors, 0 warnings |
 | Ruff on runtime surfaces, onboarding and tests | Passed |
@@ -26,9 +26,10 @@ performed.
 | Audit after the three cases | +3 decisions; chain verifier reported a valid chain with no errors |
 | UI authentication | 401 without credentials, 200 with credentials |
 | `guardian-lab demo --full` orchestration | PASS against the native stack and PASS again in the Docker VM |
-| Full-profile Docker build and VM run | PASS in the disposable Ubuntu 24.04 VM; five services healthy, GGUF present, llama.cpp serving, demo 3/3 |
+| Full-profile Docker build and VM run | PASS in the disposable Ubuntu 24.04 VM; six services healthy, GGUF present, llama.cpp serving, demo 3/3 |
 | System One container runtime | Python 3.13.17, torch **2.13.0+cpu**, Kev health observable |
-| Control room page | Rendered at 1440 and 390; live validation and observer evidence visible |
+| Control room page | Rendered at 1440 and 390; live validation, observer evidence and sandbox output visible |
+| Sandbox execution | `echo sandbox-ok` executed once in the hardened container; output returned; terminal outcome recorded through Guardian |
 
 The latency reports compared observed times with the configured budget while
 using a 10 s diagnostic timeout; they were not eight runs under an actual 2 s
@@ -42,13 +43,14 @@ functions were replaced by successful checks for that native run; the underlying
 HTTP services and model calls were exercised directly.
 
 The same source tree was then copied to the disposable Ubuntu 24.04 VM. Docker
-29.1.3 and Compose 2.40.3 built the System One image (torch 2.13.0+cpu, Kev
-pinned), pulled `ghcr.io/ggml-org/llama.cpp:server`, and reached healthy for
-Guardian, Agent, UI, llama.cpp and System One. `guardian-lab models` downloaded
-and verified the GGUF; `guardian-lab doctor` reported every check ok, including
-the GGUF, llama.cpp endpoint and served alias; `guardian-lab demo --full` passed
-3/3 cases with a valid chain. The Agent ran in dry-run and the audit showed no
-`executed` rows.
+29.1.3 and Compose 2.40.3 built the System One and executor images, pulled
+`ghcr.io/ggml-org/llama.cpp:server` by digest, and reached healthy for Guardian,
+Agent, UI, llama.cpp, System One and the executor. `guardian-lab models`
+downloaded and verified the GGUF; `guardian-lab doctor` reported every check ok,
+including the GGUF, llama.cpp endpoint and served alias, the observer and the
+executor; `guardian-lab demo --full` passed 3/3 cases with a valid chain. The
+Agent ran in dry-run. The Control room then executed `echo sandbox-ok` once in
+the isolated executor and recorded the terminal outcome through Guardian.
 
 The Docker work exposed these integration defects:
 

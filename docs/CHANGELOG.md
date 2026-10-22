@@ -15,6 +15,9 @@ Adds a full local profile and qualifies the shadow observer.
   forensics and a dry-run Agent request in one non-executing run.
 - Added the Control room page with a live decision trace, observer evidence and
   signed receipt.
+- Added an optional one-shot executor: non-root, read-only root, tmpfs workspace,
+  no external network, dropped capabilities, five-second timeout and a
+  command-bound single-use token.
 - Replaced the Ollama dependency with a digest-pinned llama.cpp service and one
   verified GGUF.
 - Replaced the quarantined torch 2.8 runtime with CPU torch 2.13.0 and the pinned

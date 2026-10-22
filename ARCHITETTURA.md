@@ -24,6 +24,7 @@ One only records observations: it supports `off` and `shadow`, and rejects `enfo
 | Agent | Command generation, strict approval consumer, simulation/outcome reporting | Python 3.11, Flask/Gunicorn |
 | UI | Authenticated dashboard, deterministic demo, status and forensic form | Python 3.11, Flask/Gunicorn |
 | Optional System One | Local typed inference, one admitted job, no execution | Python 3.13, Kev/PyTorch CPU, FastAPI/Uvicorn |
+| Optional executor | One-shot approved command in a hardened container | Python 3.11, non-root, no network, read-only root |
 | Onboarding CLI | Private configuration, read-only diagnostics and a non-executing demo | Python 3.11, standard library |
 | Shared audit module | Schema migration, redaction, transactional HMAC append and verification | `database/audit_logger.py` |
 
@@ -132,10 +133,14 @@ and Kev installation at image build and service startup. The default 500 ms
 budget remains too tight for the 0.8B model; the full profile sets a 2-second
 budget and is explicitly slower. Enforcement remains disabled.
 
-The full profile also starts a llama.cpp service and uses a pinned local GGUF for
-the semantic reviewer, forensics and Agent generation. The GGUF is downloaded
-explicitly with `guardian-lab models`; it is not baked into the image. Commands
-are still never executed.
+The full profile also starts a llama.cpp service and a separate executor. The
+executor is reachable only from the UI over an internal network; it cannot reach
+llama.cpp, Guardian or the internet. It uses a command-bound, one-use, 60-second
+HMAC token and records the terminal outcome through the UI back to Guardian.
+The model uses a pinned local GGUF for the semantic reviewer, forensics and Agent
+generation. The GGUF is downloaded explicitly with `guardian-lab models`; it is
+not baked into the image. The CLI demo never executes; only an explicit Control
+room click can run one approved command in the executor.
 
 The client accepts only loopback, fixed local-service names or private-network
 inference URLs; redirects,

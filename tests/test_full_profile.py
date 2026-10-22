@@ -115,6 +115,8 @@ def test_run_doctor_honours_the_cli_profile_over_env(tmp_path, monkeypatch) -> N
         "check_ui_auth",
         "check_audit",
         "check_audit_chain",
+        "check_system_one",
+        "check_executor",
     ):
         monkeypatch.setattr(checks_module, name, lambda *args, **kwargs: [])
     monkeypatch.setattr(

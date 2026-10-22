@@ -1,5 +1,6 @@
 (() => {
   const scenarios = JSON.parse(document.getElementById("console-scenarios").textContent || "[]");
+  const params = new URLSearchParams(window.location.search);
   const form = document.getElementById("console-form");
   const taskInput = document.getElementById("console-task");
   const commandInput = document.getElementById("console-command");
@@ -14,6 +15,14 @@
   const validationId = document.getElementById("decision-id");
   const observerBody = document.getElementById("observer-body");
   const auditBody = document.getElementById("audit-body");
+  const executionPanel = document.getElementById("execution-panel");
+  const executionState = document.getElementById("execution-state");
+  const executionOutput = document.getElementById("execution-output");
+  const executeButton = document.getElementById("execute-command");
+  const executionField = document.getElementById("decision-execution");
+  const sandboxField = document.getElementById("decision-sandbox");
+  let currentCommand = "";
+  let currentToken = "";
 
   const steps = {
     parse: document.getElementById("step-parse"),
@@ -152,6 +161,21 @@
     traceState.className = `chip ${isAllow ? "chip-ok" : "chip-block"}`;
     showObserver(observer);
     showAudit(data.audit);
+    currentCommand = commandInput.value;
+    currentToken = typeof decision.execution_token === "string" ? decision.execution_token : "";
+    const canExecute = Boolean(data.executor && isAllow && currentToken);
+    executionPanel.hidden = !canExecute;
+    executionOutput.hidden = true;
+    executionOutput.textContent = "";
+    executionState.textContent = canExecute ? "Ready" : "Unavailable";
+    executionState.className = `chip ${canExecute ? "chip-ok" : "chip-idle"}`;
+    executionField.textContent = canExecute ? "Approved; run below" : "Not executed";
+    if (canExecute && params.has("execute")) {
+      executeButton.click();
+    }
+    sandboxField.textContent = data.executor
+      ? "Hardened container, not a VM"
+      : "Not configured in this demo";
   }
 
   async function run(payload) {
@@ -198,6 +222,43 @@
     });
   });
 
+  executeButton.addEventListener("click", async () => {
+    if (!currentCommand || !currentToken) return;
+    executeButton.disabled = true;
+    executionOutput.hidden = false;
+    executionOutput.textContent = "Executing in the sandbox...";
+    executionState.textContent = "Running";
+    executionState.className = "chip chip-idle";
+    try {
+      const response = await fetch("/console/execute", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({command: currentCommand, token: currentToken}),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+      const output = [
+        `status: ${data.status || "unknown"}  exit: ${data.exit_code ?? "?"}`,
+        data.stdout ? `\n${data.stdout}` : "",
+        data.stderr ? `\nstderr: ${data.stderr}` : "",
+      ].join("");
+      executionOutput.textContent = output || "No output.";
+      executionState.textContent = data.exit_code === 0 ? "Completed" : "Finished with error";
+      executionState.className = `chip ${data.exit_code === 0 ? "chip-ok" : "chip-block"}`;
+      executionField.textContent = data.status || "executed";
+      if (data.audit) showAudit(data.audit);
+      if (data.warning) {
+        executionOutput.textContent += `\nwarning: ${data.warning}`;
+      }
+    } catch (error) {
+      executionOutput.textContent = error instanceof Error ? error.message : "Execution failed.";
+      executionState.textContent = "Error";
+      executionState.className = "chip chip-block";
+    } finally {
+      executeButton.disabled = false;
+    }
+  });
+
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     run({
@@ -208,7 +269,6 @@
   });
 
   loadScenario(0);
-  const params = new URLSearchParams(window.location.search);
   if (params.has("autorun")) {
     const scene = Math.max(0, Number(params.get("scene") || "0"));
     document.querySelectorAll(".scenario-btn")[scene]?.click();

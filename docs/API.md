@@ -167,3 +167,9 @@ curl --fail-with-body http://127.0.0.1:5000/validate \
 
 This checks a command; it does not execute it. Do not use `curl -v`, shell tracing
 or logs that expose the header.
+
+When `EXECUTOR_HMAC_KEY` is configured, an approved response also contains an
+`execution_token`. The token is bound to that exact command and validation
+identity, expires after 60 seconds and can be used once by the optional executor.
+It is not a general credential: changing the command invalidates it. The executor
+has no public host port and the UI is its only client.

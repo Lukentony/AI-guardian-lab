@@ -1286,3 +1286,22 @@ pre {
     font-size: 0.82rem;
   }
 }
+
+.execution-panel .panel-head {
+  align-items: flex-start;
+}
+
+.execution-output {
+  max-height: 220px;
+  margin: 14px 0 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(4, 9, 18, 0.72);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
