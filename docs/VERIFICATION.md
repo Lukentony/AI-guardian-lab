@@ -2,8 +2,8 @@
 
 ## 1.6.0 full-profile verification
 
-Scope: branch `fix/release-blockers`, based on `main` at `3a60310`. This is not a
-production approval. Model-based enforcement remains disabled and no remote deployment was
+Scope: `main` at `d4e28ef`, with the release-blocker fixes merged. This is not
+a production approval. Model-based enforcement remains disabled and no remote deployment was
 performed.
 
 | Check | Observed result |
@@ -15,7 +15,8 @@ performed.
 | System One runtime | Kev 0.8B on CPU torch 2.13.0, eight threads, prefix cache |
 | Latency comparison below 2 s | 8/8 observed; p50 **1,214.625 ms**; p95 **1,289.89 ms**; 10 s diagnostic timeout |
 | Calibration at the unchanged 500 ms default | 0/8 |
-| GitHub Actions CI at `3a60310` (main) | Passed |
+| GitHub Actions CI at `3a60310` (base main) | Passed |
+| GitHub Actions CI at `d4e28ef` (merged fixes) | Passed |
 | Mean per-question Brier score | **0.228625120625** on the handcrafted set |
 | `pip-audit` against torch 2.13.0 and the pinned lock | No known vulnerabilities |
 | Native full stack: Guardian, Agent, UI, Ollama, System One | All health checks passed |
