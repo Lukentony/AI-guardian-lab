@@ -294,3 +294,47 @@ def test_ui_dashboard_accepts_intent_source(monkeypatch, requests_mock):
 
     assert response.status_code == 200
     assert b"mapping" in response.data
+
+
+def test_ui_console_page_and_run(monkeypatch, requests_mock):
+    monkeypatch.setenv("UI_PASSWORD", "ui-test-password")
+    requests_mock.post(
+        f"{ui.GUARDIAN_API}/validate",
+        json={
+            "approved": True,
+            "reason": "Approved",
+            "intent_source": "mapping",
+            "validation_id": "validation-1",
+            "system_one": {"status": "observed", "latency_ms": 42, "mode": "shadow"},
+        },
+    )
+    requests_mock.get(
+        f"{ui.GUARDIAN_API}/audit",
+        json={"stats": {"total": 3, "executed": 0, "rejected": 1}, "commands": []},
+    )
+    with ui.app.test_client() as client:
+        page = client.get("/console", headers=_auth_headers())
+        response = client.post(
+            "/console/run",
+            headers=_auth_headers(),
+            json={"command": "ls /tmp", "task": "List files"},
+        )
+
+    assert page.status_code == 200
+    assert b"Decision trace" in page.data
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["decision"]["approved"] is True
+    assert payload["decision"]["system_one"]["status"] == "observed"
+    assert payload["audit"]["total"] == 3
+
+
+def test_ui_console_rejects_an_empty_command(monkeypatch):
+    monkeypatch.setenv("UI_PASSWORD", "ui-test-password")
+    with ui.app.test_client() as client:
+        response = client.post(
+            "/console/run",
+            headers=_auth_headers(),
+            json={"command": "", "task": "List files"},
+        )
+    assert response.status_code == 400

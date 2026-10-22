@@ -65,15 +65,18 @@ jobs:
           LOG_HMAC_KEY: ci-signing-key
           TASK_API_KEY: ci-operator-key
           SYSTEM_ONE_API_KEY: ci-system-one-key
+          LLM_API_KEY: ci-model-key
           UI_PASSWORD: ci-ui-password
           COMPOSE_PROFILES: full
-          OLLAMA_URL: http://ollama:11434
-          LLM_MODEL_CODER: qwen2.5-coder:3b
-          INTENT_LLM_MODEL: ollama/qwen2.5:3b
-          LLM_MODEL_EXPLAIN: qwen2.5:3b
+          LLM_API_BASE: http://llama:8080/v1
+          LLAMA_MODEL_FILE: qwen2.5-3b-instruct-q4_k_m.gguf
+          LLM_MODEL: qwen2.5-3b-instruct
+          LLM_MODEL_CODER: qwen2.5-3b-instruct
+          INTENT_LLM_MODEL: openai/qwen2.5-3b-instruct
+          LLM_MODEL_EXPLAIN: qwen2.5-3b-instruct
           SYSTEM_ONE_TIMEOUT_SECONDS: "2.0"
           INTENT_LLM_TIMEOUT_SECONDS: "30"
-          GUARDIAN_TIMEOUT_SECONDS: "15"
+          GUARDIAN_TIMEOUT_SECONDS: "45"
         run: docker compose config --quiet
 
       - name: Stop test containers

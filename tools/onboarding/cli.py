@@ -17,7 +17,6 @@ from tools.onboarding.checks import (
     check_state_dirs,
     compose_up,
     create_state_dirs,
-    pull_models,
     run_doctor,
 )
 from tools.onboarding.demo import run_demo, run_full_demo
@@ -28,6 +27,7 @@ from tools.onboarding.envfile import (
     validate_env,
     write_env_file,
 )
+from tools.onboarding.model import download_model
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -113,6 +113,11 @@ def _cmd_setup(args: argparse.Namespace) -> int:
             return 1
         print(f"Created {env_file} with mode 600. Secrets are not printed.")
 
+    if args.profile == "full" and not args.no_start and not args.no_models:
+        if download_model(root) != 0:
+            print("The model artifact is not ready.", file=sys.stderr)
+            return 1
+
     if not args.no_start:
         if compose_up(root, env_file, compose_file, build=True) != 0:
             print("The stack did not start. Check: docker compose logs --tail=100 guardian", file=sys.stderr)
@@ -149,13 +154,8 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
 
 
 def _cmd_models(args: argparse.Namespace) -> int:
-    root, env_file, compose_file = _paths(args)
-    try:
-        values = read_env_file(env_file)
-    except EnvError as exc:
-        print(f"Cannot read {env_file}: {exc}", file=sys.stderr)
-        return 2
-    return pull_models(root, env_file, compose_file, values)
+    root, _env_file, _compose_file = _paths(args)
+    return download_model(root, force=args.force)
 
 
 def _cmd_demo(args: argparse.Namespace) -> int:
@@ -185,6 +185,7 @@ def build_parser() -> argparse.ArgumentParser:
     setup = subparsers.add_parser("setup", help="create .env and optional state directories")
     setup.add_argument("--profile", choices=("demo", "local-models", "full"), default="demo")
     setup.add_argument("--no-start", action="store_true", help="write configuration only")
+    setup.add_argument("--no-models", action="store_true", help="do not download the full-profile GGUF")
     setup.add_argument(
         "--reuse", action="store_true", help="validate an existing .env instead of creating one"
     )
@@ -195,7 +196,7 @@ def build_parser() -> argparse.ArgumentParser:
     doctor.add_argument(
         "--probe-models",
         action="store_true",
-        help="also probe Ollama reachability and model presence",
+        help="also probe llama.cpp reachability and model presence",
     )
     doctor.add_argument(
         "--profile",
@@ -205,7 +206,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     doctor.set_defaults(func=_cmd_doctor)
 
-    models = subparsers.add_parser("models", help="pull the configured local models (full profile)")
+    models = subparsers.add_parser("models", help="download and verify the full-profile GGUF")
+    models.add_argument("--force", action="store_true", help="replace an existing artifact")
     models.set_defaults(func=_cmd_models)
 
     demo = subparsers.add_parser("demo", help="validate five fixed cases and inspect the audit")

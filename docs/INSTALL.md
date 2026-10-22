@@ -15,7 +15,7 @@ For a demo, do not start with this document. Use [Onboarding](ONBOARDING.md):
 ```
 
 That path needs Docker and no model, writes a private `.env` and asserts five
-deterministic decisions. The rest of this page covers the interactive provider
+deterministic decisions. The rest of this page covers the legacy interactive provider
 wizard, upgrades, manual builds and data migration.
 
 ## Interactive installation
@@ -26,7 +26,11 @@ and a non-root account authorized to use Docker. GPU support is not required for
 the baseline; the optional model service needs separate memory and model storage.
 
 ```bash
-./install.sh
+# Legacy path. For the supported 1.6 runtime use:
+./guardian-lab setup --profile full
+./guardian-lab models
+# Historical provider wizard:
+# ./install.sh
 ```
 
 The interactive wizard creates a private `.env` with separate API, operator, audit,
@@ -37,10 +41,10 @@ The installer does not start the System One profile. For the shorter demo path,
 use `guardian-lab setup --profile demo`; for the full local profile, use
 `guardian-lab setup --profile full`, then `guardian-lab models`.
 
-Configure a local Ollama service explicitly. Compose uses
-`http://host.docker.internal:11434` by default; both Guardian and Agent have the
-Linux host-gateway mapping. The generator and semantic reviewer need their
-selected models installed. Missing semantic inference denies ambiguous commands.
+The full profile uses a local llama.cpp service and a pinned GGUF. `guardian-lab
+setup --profile full` downloads it before starting the stack; `guardian-lab models`
+can download or verify it separately. Missing semantic inference denies ambiguous
+commands.
 There is no automatic cloud fallback. Choosing a hosted generator shares task
 data with that provider.
 

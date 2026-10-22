@@ -132,9 +132,9 @@ and Kev installation at image build and service startup. The default 500 ms
 budget remains too tight for the 0.8B model; the full profile sets a 2-second
 budget and is explicitly slower. Enforcement remains disabled.
 
-The full profile also starts an Ollama service and uses small local models for
-the semantic reviewer, forensics and Agent generation. Models are pulled
-explicitly with `guardian-lab models`; they are not baked into images. Commands
+The full profile also starts a llama.cpp service and uses a pinned local GGUF for
+the semantic reviewer, forensics and Agent generation. The GGUF is downloaded
+explicitly with `guardian-lab models`; it is not baked into the image. Commands
 are still never executed.
 
 The client accepts only loopback, fixed local-service names or private-network

@@ -22,23 +22,30 @@ will not verify earlier signatures. New installations create distinct keys.
 
 ## Models and execution
 
-- `LLM_PROVIDER`: generator provider, default `ollama`.
-- `LLM_MODEL_CODER`: actual generator model name, including a provider prefix
-  where LiteLLM requires one. Old `OLLAMA_MODEL_CODER` is not the runtime setting.
-- `LLM_MODEL_EXPLAIN`: forensic analysis model. Compose forwards it as
-  `FORENSICS_LLM_MODEL` to Guardian; the default is `deepseek-coder-v2:16b`.
-- `OLLAMA_URL`: explicit local/private model service address; the Compose default
-  host-gateway address differs from a host shell's localhost.
-- `INTENT_LLM_MODEL`: bounded semantic reviewer used only when required.
-- `COMPOSE_PROFILES=full`: starts Ollama and System One for the full profile.
+- `LLM_PROVIDER`: runtime provider, fixed to `llama.cpp` in the supported full
+  profile.
+- `LLM_API_BASE`: OpenAI-compatible endpoint. The full profile uses
+  `http://llama:8080/v1`; the demo does not start a model.
+- `LLM_API_KEY`: dedicated bearer key used by Guardian, Agent and llama.cpp.
+- `LLM_MODEL`: served alias, default `qwen2.5-3b-instruct`.
+- `LLAMA_MODEL_FILE`: pinned GGUF filename under `state/models`.
+- `LLM_MODEL_CODER`: generator alias used by the Agent.
+- `LLM_MODEL_EXPLAIN`: forensic analysis alias, forwarded as
+  `FORENSICS_LLM_MODEL`.
+- `INTENT_LLM_MODEL`: LiteLLM selector for the bounded reviewer, default
+  `openai/qwen2.5-3b-instruct`.
+- `COMPOSE_PROFILES=full`: starts llama.cpp and System One for the full profile.
 - `GUARDIAN_TIMEOUT_SECONDS`: Agent-to-Guardian HTTP timeout; full profile uses 45.
 - `EXECUTE_COMMANDS=false`: default simulation; setting true is not a sandbox.
   Real execution also requires an operator-registered task_id and workspace.
 - `FAIL_CLOSED_ON_LLM_ERROR=false` no longer grants approval. Unavailable or
   malformed semantic review always denies; do not depend on the obsolete flag.
 
-There is no automatic cloud fallback. Selecting a hosted generator shares task
-data with that provider. System One accepts only local/private inference endpoints.
+The default is local. There is no automatic cloud fallback. A remote
+OpenAI-compatible endpoint can be configured explicitly, but it is not a
+supported demo profile: task and command text leave the host, and the provider
+policy, key handling, cost limits and data residency need their own approval.
+System One accepts only local/private inference endpoints.
 
 ## Policy and patterns
 

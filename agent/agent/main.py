@@ -10,14 +10,14 @@ import requests
 from flask import Flask, jsonify, request
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from litellm import completion
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16384
 GUARDIAN_URL = os.getenv("GUARDIAN_URL", "http://guardian:5000")
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://host.docker.internal:11434")
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
-LLM_MODEL_CODER = os.getenv("LLM_MODEL_CODER", "qwen2.5-coder:7b")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "llama.cpp")
+LLM_API_BASE = os.getenv("LLM_API_BASE", "http://llama:8080/v1").rstrip("/")
+LLM_API_KEY = os.getenv("LLM_API_KEY", "")
+LLM_MODEL_CODER = os.getenv("LLM_MODEL_CODER", "qwen2.5-3b-instruct")
 API_KEY = os.getenv("API_KEY", "")
 try:
     GUARDIAN_TIMEOUT = float(os.getenv("GUARDIAN_TIMEOUT_SECONDS", "5"))
@@ -95,31 +95,35 @@ def run_command(command):
 
 
 def generate_command(task):
-    if LLM_PROVIDER == "ollama":
-        response = requests.post(
-            f"{OLLAMA_URL}/api/generate",
-            json={
-                "model": LLM_MODEL_CODER,
-                "prompt": f"Generate a bash command for: {task}. Return ONLY the command, no markdown.",
-                "stream": False,
-            },
-            timeout=30,
-        )
-        response.raise_for_status()
-        payload = response.json()
-        if not isinstance(payload, dict):
-            raise ValueError("Invalid generation response")
-        return clean_command(payload.get("response"))
-    response = completion(
-        model=LLM_MODEL_CODER,
-        messages=[{"role": "user", "content": f"Generate a bash command for: {task}"}],
+    headers = {"Content-Type": "application/json"}
+    if LLM_API_KEY:
+        headers["Authorization"] = f"Bearer {LLM_API_KEY}"
+    response = requests.post(
+        f"{LLM_API_BASE}/chat/completions",
+        headers=headers,
+        json={
+            "model": LLM_MODEL_CODER,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": (
+                        f"Generate one bash command for: {task}. "
+                        "Return ONLY the command, no markdown or explanation."
+                    ),
+                }
+            ],
+            "temperature": 0,
+            "max_tokens": 128,
+        },
         timeout=30,
-        max_retries=0,
     )
-    choices = getattr(response, "choices", None)
-    if not isinstance(choices, list) or len(choices) != 1:
-        raise ValueError("Invalid generation response")
-    return clean_command(getattr(getattr(choices[0], "message", None), "content", None))
+    response.raise_for_status()
+    payload = response.json()
+    try:
+        content = payload["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError) as exc:
+        raise ValueError("Invalid generation response") from exc
+    return clean_command(content)
 
 
 @app.get("/health")

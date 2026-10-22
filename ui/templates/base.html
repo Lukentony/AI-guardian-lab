@@ -29,6 +29,11 @@
                 {% else %}
                 <a href="/">Dashboard</a>
                 {% endif %}
+                {% if here.startswith('/console') %}
+                <a href="/console" class="active" aria-current="page">Control room</a>
+                {% else %}
+                <a href="/console">Control room</a>
+                {% endif %}
                 {% if here.startswith('/demo') %}
                 <a href="/demo" class="active" aria-current="page">Demo</a>
                 {% else %}

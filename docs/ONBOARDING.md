@@ -50,7 +50,7 @@ cd AI-guardian-lab
 ./guardian-lab demo
 ```
 
-The older interactive `install.sh` remains available for the provider wizard.
+The older interactive `install.sh` is legacy; the supported full profile uses `guardian-lab`.
 `guardian-lab` is the shorter and stricter path for a first test.
 
 ## What the demo proves
@@ -77,11 +77,13 @@ quality benchmark and nothing is executed.
 Open `http://127.0.0.1:8081` after the demo. The dashboard shows the signed
 decisions and links to:
 
+- **Control room**: a live decision trace with six scenes, observer evidence
+  and the signed receipt, using the same authenticated path as the API.
 - **Demo**: the same five cases as the CLI, with a short cooldown and no
   execution. Each click appends five records.
 - **Forensics**: paste or upload an OpenHands or SWE-agent transcript.
 - **Status**: Guardian, Agent and audit reachability. It does not check Docker,
-  Ollama or the signing key; use `guardian-lab doctor` for those.
+  llama.cpp or the signing key; use `guardian-lab doctor` for those.
 
 The interface is read-only apart from the demo and forensics POSTs. It has no
 command execution, no Docker socket and no database mount.
@@ -91,23 +93,16 @@ command execution, no Docker socket and no database mount.
 - `demo` keeps `EXECUTE_COMMANDS=false` and requires no model. Ambiguous commands
   are denied because semantic review is unavailable. This is the intended first
   experience.
-- `local-models` uses the same stack but treats the Ollama endpoint and the
-  configured reviewer model as required checks in `guardian-lab doctor`.
-  `setup` never downloads a model automatically.
-- `full` starts Guardian, Agent, UI, Ollama and System One. It uses
-  `qwen2.5:3b` for semantic review and forensics, and `qwen2.5-coder:3b` for the
-  Agent. It needs about 16 GB of RAM, 8 CPU cores and 15 GB of free disk for
-  images and models. Commands are still never executed.
+- `local-models` is retained for an externally managed OpenAI-compatible
+  endpoint; it is not the supported full profile.
+- `full` starts Guardian, Agent, UI, llama.cpp and System One. It uses one
+  pinned `qwen2.5-3b-instruct` GGUF for semantic review, forensics and command
+  generation. It needs about 16 GB of RAM, 8 CPU cores and 15 GB of free disk for
+  images and the model. Commands are still never executed.
 
-To connect a local Ollama instance, edit `OLLAMA_URL`, `LLM_MODEL_CODER` and
-`INTENT_LLM_MODEL` in `.env`, then run:
-
-```bash
-./guardian-lab doctor --probe-models
-```
-
-The probe checks that the Guardian container can reach the endpoint and that the
-configured reviewer model is present. It does not send a generation request.
+The full profile is local-only. A remote OpenAI-compatible endpoint can be
+configured explicitly with `LLM_API_BASE` and `LLM_API_KEY`, but it sends task
+and command text outside the host and is not a supported demo profile.
 
 ## Full profile
 
@@ -118,9 +113,11 @@ configured reviewer model is present. It does not send a generation request.
 ./guardian-lab demo --full
 ```
 
-`models` pulls the configured 3B models into the Ollama service; the first
-download can take several minutes. `doctor` then checks the models, the System
-One health endpoint, UI authentication, the audit API and the chain.
+`setup` downloads and verifies the pinned GGUF before starting the stack; `models`
+does the same explicitly and supports `--force`. The first download can take
+several minutes. `doctor` then checks the GGUF, the llama.cpp endpoint and served
+alias, the System One health endpoint, UI authentication, the audit API and the
+chain.
 `demo --full` runs deterministic allow and block cases, one semantic-review case,
 one forensics analysis and one dry-run Agent request. It also verifies that the
 observer recorded an actual observation rather than `unavailable`. The Agent
@@ -136,9 +133,9 @@ a production latency claim.
 
 `guardian-lab doctor` checks configuration values, Docker, Compose `--wait`,
 ports, state directories, the three services, UI authentication, the audit API
-and the signature chain. In the full profile it also checks Ollama, the configured
-models and the System One health endpoint. `--json` prints the same checks with
-stable keys for scripts. Failures that block the demo return exit code 1;
+and the signature chain. In the full profile it also checks the pinned GGUF,
+the llama.cpp endpoint and served alias, and the System One health endpoint.
+`--json` prints the same checks with stable keys for scripts. Failures that block the demo return exit code 1;
 configuration errors return 2.
 
 `doctor` does not print secrets. Hints name the setting to fix, not its value.
@@ -171,7 +168,7 @@ model to call Guardian voluntarily is not enforcement.
 | Windows with WSL2 | Experimental | Use a directory inside the Linux filesystem |
 | ARM64 | Not published | No native image build or smoke test |
 | Docker rootless | Experimental | UID mapping inside containers needs verification |
-| Host with limited RAM | Demo only | Three services fit the declared limits; Ollama is separate |
+| Host with limited RAM | Demo only | Three services fit the declared limits; llama.cpp and the GGUF are separate |
 
 Do not describe an untested target as supported. Docker Desktop runs a VM and
 does not behave exactly like Docker Engine on the host.

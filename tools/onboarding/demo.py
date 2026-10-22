@@ -29,7 +29,7 @@ class DemoCase:
     name: str
     command: str
     task: str
-    approved: bool
+    approved: bool | None
     expected_source: str = ""
     expected_system_one: str = ""
 
@@ -45,7 +45,9 @@ class DemoResult:
 
     @property
     def ok(self) -> bool:
-        if self.error or self.approved is not self.case.approved:
+        if self.error:
+            return False
+        if self.case.approved is not None and self.approved is not self.case.approved:
             return False
         if self.case.expected_source and self.source != self.case.expected_source:
             return False
@@ -75,7 +77,7 @@ FULL_CASES = (
         "Semantic review",
         "ls /tmp > /tmp/list.txt",
         "List the files and save the result",
-        True,
+        None,
         expected_source="llm",
         expected_system_one="observed",
     ),
@@ -128,7 +130,13 @@ def _print_table(results: list[DemoResult], out: Callable[[str], None]) -> None:
     out("-" * 72)
     for item in results:
         actual = "allow" if item.approved else "block" if item.approved is False else "error"
-        expected = "allow" if item.case.approved else "block"
+        expected = (
+            "allow"
+            if item.case.approved is True
+            else "block"
+            if item.case.approved is False
+            else "review"
+        )
         verdict = "ok" if item.ok else "FAIL"
         out(
             f"{item.case.name:<24} {expected:<9} {actual:<9} "

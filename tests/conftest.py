@@ -20,7 +20,8 @@ os.environ.update(
         "POLICY_PATH": str(ROOT_DIR / "guardian/config/policy.yaml"),
         "DB_PATH": str(Path(_runtime.name) / "audit.db"),
         "LEARNED_PATH": str(Path(_runtime.name) / "learned.yaml"),
-        "OLLAMA_URL": "http://127.0.0.1:11434",
+        "LLM_API_BASE": "http://127.0.0.1:18080/v1",
+        "LLM_API_KEY": "ci-model-key",
         "SYSTEM_ONE_CONFIG": str(ROOT_DIR / "guardian/config/system_one.yaml"),
     }
 )
@@ -54,7 +55,7 @@ def isolated_state(monkeypatch, tmp_path, requests_mock):
     monkeypatch.setattr(main, "LEARNED_PATH", str(tmp_path / "learned.yaml"))
     init_db(path)
     main.limiter.reset()
-    monkeypatch.setattr(analyzer, "_ollama_chat", lambda *args, **kwargs: None)
+    monkeypatch.setattr(analyzer, "_openai_chat", lambda *args, **kwargs: None)
 
     def offline_completion(**kwargs):
         raise RuntimeError("Live model calls are disabled in tests")

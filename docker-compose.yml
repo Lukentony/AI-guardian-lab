@@ -13,10 +13,12 @@ services:
       API_KEY: ${API_KEY:?Set API_KEY in .env}
       LOG_HMAC_KEY: ${LOG_HMAC_KEY:-}
       TASK_API_KEY: ${TASK_API_KEY:-}
-      INTENT_LLM_MODEL: ${INTENT_LLM_MODEL:-ollama/deepseek-coder-v2:16b}
+      INTENT_LLM_MODEL: ${INTENT_LLM_MODEL:-openai/qwen2.5-3b-instruct}
       INTENT_LLM_TIMEOUT_SECONDS: ${INTENT_LLM_TIMEOUT_SECONDS:-2}
-      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
-      FORENSICS_LLM_MODEL: ${LLM_MODEL_EXPLAIN:-deepseek-coder-v2:16b}
+      LLM_API_BASE: ${LLM_API_BASE:-http://llama:8080/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-qwen2.5-3b-instruct}
+      FORENSICS_LLM_MODEL: ${LLM_MODEL_EXPLAIN:-qwen2.5-3b-instruct}
       DB_PATH: /var/lib/guardian/audit.db
       LEARNED_PATH: /var/lib/guardian-learned/learned_patterns.yaml
       SYSTEM_ONE_URL: ${SYSTEM_ONE_URL:-http://system-one:8009/v1/systemone}
@@ -58,9 +60,10 @@ services:
     environment:
       GUARDIAN_URL: http://guardian:5000
       GUARDIAN_TIMEOUT_SECONDS: ${GUARDIAN_TIMEOUT_SECONDS:-5}
-      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
-      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
-      LLM_MODEL_CODER: ${LLM_MODEL_CODER:-qwen2.5-coder:7b}
+      LLM_PROVIDER: llama.cpp
+      LLM_API_BASE: ${LLM_API_BASE:-http://llama:8080/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL_CODER: ${LLM_MODEL_CODER:-qwen2.5-3b-instruct}
       API_KEY: ${API_KEY:?Set API_KEY in .env}
       EXECUTE_COMMANDS: ${EXECUTE_COMMANDS:-false}
       EXECUTION_WORKSPACE: /workspace
@@ -166,14 +169,28 @@ services:
       timeout: 10s
       retries: 20
       start_period: 300s
-  ollama:
+  llama:
     profiles: [full]
-    image: ollama/ollama:0.40.8
+    image: ghcr.io/ggml-org/llama.cpp:server@sha256:8c74db29f1a2bef3f0a331b52c4d6214601dfceed4bee0b94cc48b3b23ff257d
     networks: [agent-net]
-    environment:
-      OLLAMA_HOST: 0.0.0.0:11434
+    command:
+      - "--model"
+      - "/models/${LLAMA_MODEL_FILE:-qwen2.5-3b-instruct-q4_k_m.gguf}"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8080"
+      - "--ctx-size"
+      - "4096"
+      - "--threads"
+      - "${LLAMA_THREADS:-8}"
+      - "--jinja"
+      - "--alias"
+      - "${LLM_MODEL:-qwen2.5-3b-instruct}"
+      - "--api-key"
+      - "${LLM_API_KEY:?Set LLM_API_KEY in .env}"
     volumes:
-      - ollama-models:/root/.ollama
+      - ./state/models:/models:ro
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
     restart: unless-stopped
@@ -181,17 +198,16 @@ services:
       resources:
         limits:
           cpus: '6.0'
-          memory: 12G
+          memory: 8G
     healthcheck:
-      test: ["CMD", "ollama", "list"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 20
-      start_period: 60s
+      start_period: 120s
 
 networks:
   agent-net:
     driver: bridge
 volumes:
   system-one-models:
-  ollama-models:

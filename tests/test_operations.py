@@ -78,7 +78,7 @@ def test_compose_static_security_and_build_contexts():
     assert "volumes" not in services["ui"]
     assert "ports" not in services["system-one"]
     assert services["system-one"]["profiles"] == ["system-one", "full"]
-    assert services["ollama"]["profiles"] == ["full"]
+    assert services["llama"]["profiles"] == ["full"]
     assert "${INTENT_LLM_TIMEOUT_SECONDS" in services["guardian"]["environment"][
         "INTENT_LLM_TIMEOUT_SECONDS"
     ]

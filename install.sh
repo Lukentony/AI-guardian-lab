@@ -469,8 +469,8 @@ log_success ".env file created"
 chmod 600 .env || log_warn "Could not set strict permissions on .env (platform limit)"
 
 log_info "Step 5/8: Initializing directories..."
-mkdir -p state/audit state/learned
-chmod 700 state/audit state/learned
+mkdir -p state/audit state/learned state/models
+chmod 700 state/audit state/learned state/models state/models
 
 log_info "Step 6/8: Building Docker images..."
 # Compose owns the build contexts; Guardian is built from the repository root.
