@@ -208,7 +208,7 @@ them before they become policy.
 
 [Verification](docs/VERIFICATION.md) records the passing tests, the dependency
 audit, the qualified CPU experiment and the container checks run in a disposable
-Ubuntu 24.04 VM. GitHub CI passed on `main` at `d4e28ef`; see Verification for the recorded
+Ubuntu 24.04 VM. GitHub CI passed on `main` at `f418346`; see Verification for the recorded
 run. Synthetic fixtures cover regressions; they do not measure real-world detection accuracy.
 
 Every executor needs a pre-execution hook. Asking a model to call Guardian is not
