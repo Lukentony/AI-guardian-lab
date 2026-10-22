@@ -2,8 +2,8 @@
 
 ## 1.6.0 full-profile verification
 
-Scope: branch `feat/sandbox-executor`, based on `main` at `7c60917`. This is not
-a production approval. Model-based enforcement remains disabled and no remote deployment was
+Scope: `main` at `f418346`, with the llama.cpp, Control room and sandbox-executor
+changes merged. This is not a production approval. Model-based enforcement remains disabled and no remote deployment was
 performed.
 
 | Check | Observed result |
@@ -17,6 +17,7 @@ performed.
 | Calibration at the unchanged 500 ms default | 0/8 |
 | GitHub Actions CI at `3a60310` (base main) | Passed |
 | GitHub Actions CI at `d4e28ef` (merged fixes) | Passed |
+| GitHub Actions CI at `f418346` (main) | Passed |
 | Mean per-question Brier score | **0.228625120625** on the handcrafted set |
 | `pip-audit` against torch 2.13.0 and the pinned lock | No known vulnerabilities |
 | Native full stack: Guardian, Agent, UI, llama.cpp, System One | All health checks passed |
